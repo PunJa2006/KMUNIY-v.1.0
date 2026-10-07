@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+  <title data-i18n="สมัครสมาชิก | Mairu KMUTNB Community">สมัครสมาชิก | Mairu KMUTNB Community</title>
+  <script src="theme.js"></script>
+<link rel="stylesheet" href="main.css">
+<link rel="icon" type="image/png" href="kmutnb-logo.png">
+</head>
+<body class="auth-page" data-page="register">
+  <header class="site-header"><h1><a class="brand" href="/"><img class="brand-logo" src="kmutnb-logo.png" alt="ตรามหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ" data-i18n-alt="ตรามหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ" width="52" height="52"><span>Mairu <small>KMUTNB Community</small></span></a></h1></header>
+  <main class="auth-card">
+    <p class="eyebrow" data-i18n="เริ่มต้นเป็นส่วนหนึ่งของชุมชน">เริ่มต้นเป็นส่วนหนึ่งของชุมชน</p>
+    <h2 data-i18n="สมัครสมาชิก">สมัครสมาชิก</h2>
+    <p id="status" role="status" aria-live="polite" data-i18n="กำลังเตรียมระบบ…">กำลังเตรียมระบบ…</p>
+    <p><button id="choose-google" type="button" disabled data-i18n="สมัครด้วย Email (Google)">สมัครด้วย Email (Google)</button></p>
+    <form id="register-form">
+      <fieldset disabled id="register-fields">
+        <legend data-i18n="สมัครด้วย Username">สมัครด้วย Username</legend>
+        <p><label for="new-username">Username</label><br><input id="new-username" autocomplete="username" pattern="(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9_.^]{2,24}" minlength="2" maxlength="24" required aria-describedby="username-help"></p>
+        <p id="username-help" data-i18n="มีตัวอักษรอังกฤษและตัวเลขอย่างน้อยอย่างละ 1 ตัว ใช้ _ . ^ ได้">มีตัวอักษรอังกฤษและตัวเลขอย่างน้อยอย่างละ 1 ตัว ใช้ _ . ^ ได้</p>
+        <p><label for="new-password" data-i18n="Password (อย่างน้อย 8 ตัว)">Password (อย่างน้อย 8 ตัว)</label><br><input id="new-password" type="password" autocomplete="new-password" minlength="8" maxlength="4096" required></p>
+        <p><label for="confirm-password" data-i18n="ยืนยัน Password">ยืนยัน Password</label><br><input id="confirm-password" type="password" autocomplete="new-password" minlength="8" maxlength="4096" required></p>
+        <button id="register-submit" type="submit" data-i18n="สมัครด้วย Username">สมัครด้วย Username</button>
+      </fieldset>
+    </form>
+    <p><a href="/" data-i18n="กลับหน้าเข้าสู่ระบบ">กลับหน้าเข้าสู่ระบบ</a></p>
+    <noscript data-i18n="กรุณาเปิด JavaScript เพื่อสมัครสมาชิก">กรุณาเปิด JavaScript เพื่อสมัครสมาชิก</noscript>
+  </main>
+  <script type="module" src="register.js"></script>
+</body>
+</html>
+

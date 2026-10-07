@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+  <title data-i18n="เข้าสู่ระบบ | Mairu KMUTNB Community">เข้าสู่ระบบ | Mairu KMUTNB Community</title>
+  <script src="theme.js"></script>
+<link rel="stylesheet" href="main.css">
+<link rel="icon" type="image/png" href="kmutnb-logo.png">
+</head>
+<body class="auth-page" data-page="login">
+  <header class="site-header"><h1><a class="brand" href="/"><img class="brand-logo" src="kmutnb-logo.png" alt="ตรามหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ" data-i18n-alt="ตรามหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ" width="52" height="52"><span>Mairu <small>KMUTNB Community</small></span></a></h1></header>
+  <main class="auth-card">
+    <p class="eyebrow" data-i18n="ยินดีต้อนรับกลับมา">ยินดีต้อนรับกลับมา</p>
+    <h1 id="login-heading" data-i18n="เข้าสู่ระบบ">เข้าสู่ระบบ</h1>
+    <p id="status" role="status" aria-live="polite" data-i18n="กำลังเตรียมระบบ…">กำลังเตรียมระบบ…</p>
+    <div id="login-options">
+    <form id="login-form">
+      <fieldset disabled id="login-fields">
+        <legend data-i18n="ข้อมูลเข้าสู่ระบบ">ข้อมูลเข้าสู่ระบบ</legend>
+        <p><label for="identity">Username</label><br>
+          <input id="identity" name="username" autocomplete="username" maxlength="254" required></p>
+        <p><label for="password">Password</label><br>
+          <input id="password" name="password" type="password" autocomplete="current-password" maxlength="4096" required></p>
+        <p><label><input id="remember" type="checkbox"> Remember me</label></p>
+        <button type="submit" data-i18n="เข้าสู่ระบบ">เข้าสู่ระบบ</button>
+        <p class="separator" data-i18n="หรือ">หรือ</p>
+        <p><button id="google-login" type="button" data-i18n="เข้าสู่ระบบด้วย Google (Email)">เข้าสู่ระบบด้วย Google (Email)</button></p>
+        <button id="guest" type="button" data-i18n="เข้าสู่ระบบแบบ Guest">เข้าสู่ระบบแบบ Guest</button>
+      </fieldset>
+    </form>
+    <p class="auth-footer" data-i18n="ยังไม่มีบัญชี?">ยังไม่มีบัญชี?</p>
+    <form action="register.html" method="get">
+      <button type="submit" data-i18n="สมัครสมาชิก">สมัครสมาชิก</button>
+    </form>
+    </div>
+    <section id="banned-account" hidden>
+      <p data-i18n="ติดต่อปลดแบนได้ที่ &quot;รายงานปัญหาการใช้งาน&quot;">ติดต่อปลดแบนได้ที่ "รายงานปัญหาการใช้งาน"</p>
+      <button id="open-ban-appeal" type="button" aria-haspopup="dialog" aria-controls="ban-appeal-dialog" data-i18n="รายงานปัญหาการใช้งาน">รายงานปัญหาการใช้งาน</button>
+      <button id="banned-signout" type="button" data-i18n="ใช้บัญชีอื่น">ใช้บัญชีอื่น</button>
+    </section>
+    <dialog id="ban-appeal-dialog" aria-labelledby="ban-appeal-heading">
+      <h2 id="ban-appeal-heading" data-i18n="คำร้องจากผู้ถูก Ban">คำร้องจากผู้ถูก Ban</h2>
+      <p data-i18n="ส่งถึง Dev และ Admin">ส่งถึง Dev และ Admin</p>
+      <form id="ban-appeal-form"><fieldset id="ban-appeal-fields">
+        <p><label for="ban-appeal-details" data-i18n="อธิบายคำร้องขอปลดแบน">อธิบายคำร้องขอปลดแบน</label><textarea id="ban-appeal-details" rows="5" maxlength="2000" required></textarea></p>
+        <p id="ban-appeal-status" role="status" aria-live="polite"></p>
+        <button type="submit" data-i18n="ส่งคำร้อง">ส่งคำร้อง</button><button id="cancel-ban-appeal" type="button" data-i18n="ยกเลิก">ยกเลิก</button>
+      </fieldset></form>
+    </dialog>
+    <noscript data-i18n="กรุณาเปิด JavaScript เพื่อเข้าสู่ระบบ">กรุณาเปิด JavaScript เพื่อเข้าสู่ระบบ</noscript>
+  </main>
+  <script type="module" src="login.js"></script>
+</body>
+</html>
+
