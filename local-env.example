@@ -1,0 +1,4 @@
+# Copy to .env.local and set the service account file path on your computer.
+# Keep this JSON outside the repository and public/.
+GOOGLE_APPLICATION_CREDENTIALS="C:/path/to/firebase-service-account.json"
+FIREBASE_PROJECT_ID=for-web-com1

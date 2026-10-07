@@ -1,0 +1,14 @@
+node_modules/
+.vercel/
+.env*
+!.env.example
+service-account*.json
+*service-account*.json
+firebase-adminsdk*.json
+*.pem
+*.key
+media-data/
+outputs/
+*.log
+.DS_Store
+Thumbs.db
