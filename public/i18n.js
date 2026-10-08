@@ -1,4 +1,11 @@
 const english = {
+"โพสต์ของคุณถูกลบ":"Your post was removed",
+"Admin หรือ Dev ลบโพสต์นี้ด้วยเหตุผลต่อไปนี้":"An Admin or Dev removed this post for the following reason.",
+"เหตุผลที่ลบโพสต์":"Reason for removal",
+"อธิบายเหตุผลที่ลบโพสต์":"Explain why this post is being removed",
+"กรุณาอธิบายเหตุผลที่ลบโพสต์":"Please explain why this post is being removed",
+"เหตุผลที่ลบโพสต์ต้องไม่เกิน 2,000 ตัวอักษร":"The removal reason must be no more than 2,000 characters",
+"โพสต์พร้อมไฟล์แนบ":"Post with attachments",
 "ประกาศ":"Announcements",
 "ประกาศพร้อมไฟล์แนบ":"Announcement with attachments",
 "เฉพาะ Admin และ Dev เท่านั้นที่โพสต์ประกาศได้":"Only Admin and Dev can publish announcements",

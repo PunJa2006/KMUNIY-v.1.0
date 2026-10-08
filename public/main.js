@@ -9,7 +9,7 @@ function updateAnnouncement() {
   $('feed-heading').hidden = view === 'home';
 }
 updateAnnouncement();
-let authorPostId = null, authorHandle = null;
+let authorPostId = null, authorHandle = null, authorUid = null;
 let selectedHashtag = null;
 const authorUrls = [];
 let selectedCategory = 'ทั้งหมด';
@@ -37,7 +37,51 @@ for (const [id, category] of Object.entries(categoryButtons)) {
   });
 }
 let loading = false, posting = false, editing = false, redirecting = false;
-let feedVersion = 0;
+let feedVersion = 0, activeFeedMediaVersion = 0;
+let homeFeed = null, homeFeedReady = false, homeScrollTop = 0;
+const homeFeedKey = () => JSON.stringify([selectedCategory, selectedHashtag]);
+function clearHomeFeed() {
+  if (homeFeed) { releaseUrls(homeFeed.mediaUrls); releaseUrls(homeFeed.photoUrls); }
+  homeFeed = null;
+}
+function rememberHomeFeed() {
+  homeScrollTop = typeof window === 'undefined' ? 0 : window.scrollY;
+  if (!homeFeedReady) return;
+  homeFeed = {
+    key: homeFeedKey(), nodes: [...$('feed').children],
+    message: $('feed-status').textContent, version: activeFeedMediaVersion,
+    mediaUrls: feedUrls, photoUrls: feedPhotoUrls
+  };
+  feedUrls = []; feedPhotoUrls = []; homeFeedReady = false;
+}
+function restoreHomeFeed() {
+  if (!homeFeed || homeFeed.key !== homeFeedKey()) return false;
+  feedVersion++;
+  releaseUrls(feedUrls); releaseUrls(feedPhotoUrls);
+  feedUrls = homeFeed.mediaUrls; feedPhotoUrls = homeFeed.photoUrls;
+  activeFeedMediaVersion = homeFeed.version;
+  postIdentityObserver?.disconnect();
+  $('feed').replaceChildren(...homeFeed.nodes);
+  for (const card of homeFeed.nodes) {
+    for (const identity of card.querySelectorAll?.('.post-author-nickname, .post-author-handle') || []) postIdentityObserver?.observe(identity);
+  }
+  $('feed-status').textContent = homeFeed.message;
+  $('feed-status').className = '';
+  $('feed').setAttribute('aria-busy', 'false');
+  homeFeed = null; homeFeedReady = true;
+  return true;
+}
+let viewScrollVersion = 0;
+function scrollView(top) {
+  const version = ++viewScrollVersion;
+  if (typeof window === 'undefined') return;
+  const restore = () => {
+    if (version === viewScrollVersion) window.scrollTo({top, left: 0, behavior: 'instant'});
+  };
+  restore();
+  // Restore again after layout so browser scroll anchoring cannot shift the saved position.
+  window.requestAnimationFrame?.(() => window.requestAnimationFrame(restore));
+}
 const postIdentityObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(entries => {
   for (const { target } of entries) target.dataset.clipped = String(target.scrollWidth > target.clientWidth + 1);
 });
@@ -58,7 +102,8 @@ function setPostCooldown(availableAt) {
   if (updatePostCooldown()) postCooldownTimer = setInterval(updatePostCooldown, 1000);
 }
 let selectedPhoto = null, uploadedPhotoId = null, photoPreviewUrl = null;
-const profileUrls = [], feedPhotoUrls = [], editPhotoUrls = [];
+const profileUrls = [], editPhotoUrls = [];
+let feedPhotoUrls = [];
 const avatarLoads = new WeakMap();
 async function loadAvatar(image, id, urls) {
   const version = Symbol();
@@ -69,7 +114,7 @@ async function loadAvatar(image, id, urls) {
     const response = await fetch('/api/media?id=' + encodeURIComponent(id), { headers: { Authorization: 'Bearer ' + await sdk.auth.currentUser.getIdToken() } });
     if (!response.ok) return;
     const blob = await response.blob();
-    if (avatarLoads.get(image) !== version || image.isConnected === false) return;
+    if (avatarLoads.get(image) !== version) return;
     const url = URL.createObjectURL(blob); urls.push(url); image.src = url;
   } catch {}
 }
@@ -123,14 +168,15 @@ async function loadMedia(item, container, version) {
     const response = await fetch('/api/media?id=' + encodeURIComponent(item.id), { headers: { Authorization: 'Bearer ' + await sdk.auth.currentUser.getIdToken() } });
     if (!response.ok) throw new Error(t('โหลดไฟล์แนบไม่ได้'));
     const blob = await response.blob();
-    if (version !== feedVersion) return;
+    const urls = version === activeFeedMediaVersion ? feedUrls : homeFeed?.version === version ? homeFeed.mediaUrls : null;
+    if (!urls) return;
     const url = URL.createObjectURL(blob);
-    feedUrls.push(url);
+    urls.push(url);
     const media = mediaElement(item.type);
     media.src = url;
     container.replaceChildren(media);
     container.setAttribute('aria-busy', 'false');
-  } catch { if (version === feedVersion) { container.setAttribute('aria-busy', 'false'); container.textContent = t('โหลดไฟล์แนบไม่ได้ กรุณารีเฟรชอีกครั้ง'); } }
+  } catch { if (version === activeFeedMediaVersion || homeFeed?.version === version) { container.setAttribute('aria-busy', 'false'); container.textContent = t('โหลดไฟล์แนบไม่ได้ กรุณารีเฟรชอีกครั้ง'); } }
 }
 $('post-files').addEventListener('change', () => {
   const files = [...$('post-files').files];
@@ -176,10 +222,10 @@ async function refreshPermissions(){
   try{const fresh=await call('profile-read');Object.assign(profile,fresh);updatePermissions();}catch(error){if(error.code!=='ACCOUNT_BANNED')showError(error);}
 }
 function themeKey() { return `community-theme:${sdk.auth.currentUser.uid}`; }
-function setTheme(theme) {
+function setTheme(theme, remember = false) {
   document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
   for (const value of ['light', 'dark']) $('theme-' + value).setAttribute('aria-pressed', String(value === document.documentElement.dataset.theme));
-  try { localStorage.setItem('community-last-theme', document.documentElement.dataset.theme); } catch {}
+  if (remember) try { localStorage.setItem('community-last-theme', document.documentElement.dataset.theme); } catch {}
 }
 function updatePostCategories() {
   const guest = sdk?.auth.currentUser?.isAnonymous === true;
@@ -202,6 +248,31 @@ function renderProfile() {
   $('guest-note').hidden = !profile.isGuest;
   updatePermissions();
 }
+let checkingPostNotice=false;
+async function checkPostNotice(){
+  if(checkingPostNotice || redirecting || document.visibilityState==='hidden' || !sdk?.auth.currentUser || $('post-notice-dialog').open)return;
+  checkingPostNotice=true;
+  try{
+    const data=await call('post-notice-next');
+    if(data.notice){
+      $('post-notice-preview').textContent=data.notice.post?.text || t(data.notice.post?.hasMedia?'โพสต์พร้อมไฟล์แนบ':'โพสต์');
+      $('post-notice-reason').textContent=data.notice.reason;
+      $('post-notice-dialog').showModal();
+    }
+  }catch(error){
+    // A failed request leaves unclaimed notices on the server for the next reset.
+    if(error.code==='ACCOUNT_BANNED')showError(error);
+  }finally{checkingPostNotice=false;}
+}
+function dismissPostNotice(){
+  $('post-notice-dialog').close();
+  checkPostNotice();
+}
+$('close-post-notice').addEventListener('click',dismissPostNotice);
+$('post-notice-dialog').addEventListener('cancel',event=>{event.preventDefault();dismissPostNotice();});
+window.addEventListener?.('pageshow',event=>{
+  if(event.persisted && profile && !loading)checkPostNotice();
+});
 async function load() {
   if (loading || !sdk.auth.currentUser) return;
   loading = true;
@@ -213,11 +284,14 @@ async function load() {
     }
     setPostCooldown(profile.postAvailableAt);
     renderProfile();
-    try { setTheme(localStorage.getItem(themeKey())); } catch { setTheme('light'); }
+    let savedTheme;
+    try { savedTheme = localStorage.getItem(themeKey()); } catch {}
+    setTheme(['light', 'dark'].includes(savedTheme) ? savedTheme : document.documentElement.dataset.theme);
     $('open-reports').hidden = !profile.canReceiveReports;
     finishInitialLoading();
     $('app').hidden = false;
     status.textContent = '';
+    await checkPostNotice();
     await loadFeed();
   } catch (error) {
     if (error.status === 404) {
@@ -291,11 +365,11 @@ $('comment-edit-form').addEventListener('submit',async event=>{
   catch(error){$('comment-edit-status').textContent=localizeError(error.message);}
   finally{savingComment=false;$('comment-edit-fields').disabled=false;updateCommentEditTime();}
 });
-function openAuthor(id, handle = null) {
+function openAuthor(id, handle = null, profileUid = null) {
   if (commenting) return;
   for (const kind of ['likes', 'comments']) if ($(kind + '-dialog').open) $(kind + '-dialog').close();
   closeSearch();
-  authorPostId = id; authorHandle = handle;
+  authorPostId = id; authorHandle = handle; authorUid = profileUid;
   switchView('author');
 }
 function postAuthorName(container, person, handle, role) {
@@ -314,15 +388,18 @@ function personCard(person, postId = null) {
   const row = document.createElement('div');
   const photo = document.createElement('img');
   photo.className = 'post-avatar'; photo.alt = t('รูปโปรไฟล์');
-  const name = document.createElement('strong');
+  const canOpen = Boolean(postId || person.profileUid || person.handle);
+  const name = document.createElement(canOpen ? 'button' : 'strong');
+  const openProfile = () => openAuthor(postId, postId ? null : person.handle, postId ? null : person.profileUid);
+  if (canOpen) { name.type = 'button'; name.className = 'person-name-button'; name.setAttribute('aria-label', t('ดูโปรไฟล์ของ ') + personName(person)); name.addEventListener('click', openProfile); }
   if (postId) postAuthorName(name, person, person.handle, person.role);
   else name.textContent = personName(person) + (person.handle ? ' @' + person.handle : '');
   if(person.edited){const edited=document.createElement('span');edited.className='comment-edited';edited.textContent=t('แก้ไขแล้ว');name.append(edited);}
   row.className='person-card';
-  if (postId) {
+  if (canOpen) {
     const button = document.createElement('button'); button.type = 'button'; button.className = 'author-button';
     button.setAttribute('aria-label', t('ดูโปรไฟล์ของ ') + personName(person));
-    button.append(photo); button.addEventListener('click', () => openAuthor(postId));
+    button.append(photo); button.addEventListener('click', openProfile);
     row.append(button, name);
   } else row.append(photo, name);
   loadAvatar(photo, person.photoId, socialPhotoUrls);
@@ -565,16 +642,19 @@ function finishInitialLoading() {
   status.className = '';
 }
 
-async function loadFeed() {
+async function loadFeed({ navigation = false } = {}) {
+  if (!navigation) clearHomeFeed();
   if (view === 'search' || view === 'settings') return;
   const version = ++feedVersion;
   const targetView = view;
+  activeFeedMediaVersion = version;
+  if (targetView === 'home') homeFeedReady = false;
   $('feed').setAttribute('aria-busy', 'true');
   releaseUrls(feedUrls);
   releaseUrls(feedPhotoUrls);
   showFeedSkeleton();
   try {
-    const data = await call(targetView === 'saved' ? 'saved-list' : targetView === 'author' ? 'author-profile' : targetView === 'archive' ? 'archive-list' : targetView === 'me' ? 'my-posts' : 'posts-list', targetView === 'author' ? (authorHandle ? { handle: authorHandle } : { id: authorPostId }) : targetView === 'home' ? { category: selectedCategory, ...(selectedHashtag ? { hashtag: selectedHashtag } : {}) } : {});
+    const data = await call(targetView === 'saved' ? 'saved-list' : targetView === 'author' ? 'author-profile' : targetView === 'archive' ? 'archive-list' : targetView === 'me' ? 'my-posts' : 'posts-list', targetView === 'author' ? (authorUid ? { profileUid: authorUid } : authorHandle ? { handle: authorHandle } : { id: authorPostId }) : targetView === 'home' ? { category: selectedCategory, ...(selectedHashtag ? { hashtag: selectedHashtag } : {}) } : {});
     if (version === feedVersion) {
       if (targetView === 'author') {
         releaseUrls(authorUrls);
@@ -589,6 +669,7 @@ async function loadFeed() {
       }
       if(targetView==='home')renderAnnouncements(data.announcements || []);
       renderPosts(data.posts, targetView);
+      if (targetView === 'home') homeFeedReady = true;
       if(targetView==='saved')savedSignature=JSON.stringify(data.posts);
     }
   } catch (error) {
@@ -603,7 +684,10 @@ async function loadFeed() {
     }
   }
 }
-function switchView(next) {
+function switchView(next, { reset = false } = {}) {
+  if (next === view && !reset && next !== 'author') return;
+  if (view === 'home' && next !== 'home') rememberHomeFeed();
+  if (reset) { clearHomeFeed(); homeFeedReady = false; homeScrollTop = 0; }
   if (next !== view && (typeof matchMedia !== 'function' || !matchMedia('(prefers-reduced-motion: reduce)').matches)) {
     $('community-content').getAnimations?.().forEach(animation => animation.cancel());
     $('community-content').animate?.([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 320, easing: 'cubic-bezier(.2,.7,.25,1)' });
@@ -627,15 +711,18 @@ function switchView(next) {
   status.textContent = '';
   if (view === 'search' || view === 'settings') {
     feedVersion++;
+    activeFeedMediaVersion = 0;
     releaseUrls(feedUrls); releaseUrls(feedPhotoUrls);
     $('feed').setAttribute('aria-busy', 'false');
-  } else loadFeed();
+  } else if (!(view === 'home' && restoreHomeFeed())) loadFeed({ navigation: true });
+  scrollView(view === 'home' && !reset ? homeScrollTop : 0);
 }
 $('brand-home').addEventListener('click', event => {
   event.preventDefault();
   selectedCategory = 'ทั้งหมด'; selectedHashtag = null;
   for (const [id, category] of Object.entries(categoryButtons)) $(id).setAttribute('aria-pressed', String(category === selectedCategory));
-  switchView('home');
+  checkPostNotice();
+  switchView('home', { reset: true });
 });
 
 let searchVersion = 0, trendingVersion = 0, searchTimer = null;
@@ -692,7 +779,7 @@ function selectHashtag(tag) {
   if ($('comments-dialog').open) $('comments-dialog').close();
   selectedHashtag = tag; selectedCategory = 'ทั้งหมด';
   for (const [id, category] of Object.entries(categoryButtons)) $(id).setAttribute('aria-pressed', String(category === selectedCategory));
-  switchView('home');
+  switchView('home', { reset: true });
 }
 $('clear-hashtag').addEventListener('click', () => { selectedHashtag = null; updateHashtagFilter(); loadFeed(); });
 function renderTaggedText(container, text) {
@@ -861,7 +948,7 @@ $('open-saved').addEventListener('click',()=>{switchView('saved');});
 async function refreshSaved(){
   if(view!=='saved' || document.hidden || loading || $('feed').getAttribute('aria-busy')==='true')return;
   const version=feedVersion;
-  try{const data=await call('saved-list');if(view==='saved' && version===feedVersion && JSON.stringify(data.posts)!==savedSignature){feedVersion++;releaseUrls(feedUrls);releaseUrls(feedPhotoUrls);renderPosts(data.posts,'saved');savedSignature=JSON.stringify(data.posts);}}
+  try{const data=await call('saved-list');if(view==='saved' && version===feedVersion && JSON.stringify(data.posts)!==savedSignature){activeFeedMediaVersion=++feedVersion;releaseUrls(feedUrls);releaseUrls(feedPhotoUrls);renderPosts(data.posts,'saved');savedSignature=JSON.stringify(data.posts);}}
   catch(error){if(view==='saved' && version===feedVersion)$('feed-status').textContent=localizeError(error.message);}
 }
 let reportsCategory='post';
@@ -907,7 +994,12 @@ async function openModeration(operation,data,title,description){
   if(moderationBusy)return;
   const version=++moderationVersion;stopModerationTimer();moderationPending=null;
   $('moderation-heading').textContent=t(title);$('moderation-description').textContent=t(description);
-  $('moderation-reason-field').hidden=operation!=='user-ban';$('moderation-reason').value='';$('moderation-reason').disabled=false;
+  const needsReason=['user-ban','post-delete'].includes(operation);
+  const reasonLabel=operation==='post-delete'?'เหตุผลที่ลบโพสต์':'เหตุผลที่แบน';
+  const reasonPlaceholder=operation==='post-delete'?'อธิบายเหตุผลที่ลบโพสต์':'อธิบายเหตุผลที่แบน';
+  $('moderation-reason-field').hidden=!needsReason;$('moderation-reason').value='';$('moderation-reason').disabled=false;
+  $('moderation-reason-label').textContent=t(reasonLabel);$('moderation-reason-label').setAttribute('data-i18n',reasonLabel);
+  $('moderation-reason').placeholder=t(reasonPlaceholder);$('moderation-reason').setAttribute('data-i18n-placeholder',reasonPlaceholder);
   $('moderation-status').textContent=t('กำลังเตรียมการยืนยัน…');
   $('moderation-confirm').disabled=true;$('moderation-confirm').textContent=t('แน่ใจ');$('moderation-cancel').disabled=false;
   $('moderation-dialog').showModal();
@@ -925,7 +1017,8 @@ $('moderation-dialog').addEventListener('cancel',event=>{if(moderationBusy)event
 $('moderation-dialog').addEventListener('close',()=>{moderationVersion++;stopModerationTimer();moderationPending=null;});
 $('moderation-confirm').addEventListener('click',async()=>{
   if(moderationBusy || !$('moderation-dialog').open || !moderationPending || Date.now()<moderationReadyAt)return;
-  const pending=moderationPending;const reason=pending.operation==='user-ban'?$('moderation-reason').value.trim():null;
+  const pending=moderationPending;const reason=['user-ban','post-delete'].includes(pending.operation)?$('moderation-reason').value.trim():null;
+  if(pending.operation==='post-delete' && !reason){$('moderation-status').textContent=t('กรุณาอธิบายเหตุผลที่ลบโพสต์');$('moderation-reason').focus();return;}
   moderationBusy=true;$('moderation-reason').disabled=true;$('moderation-confirm').disabled=true;$('moderation-cancel').disabled=true;
   try{
     await call(pending.operation,{...pending.data,confirmation:pending.confirmation,...(reason!==null?{reason}:{})});
@@ -987,7 +1080,7 @@ $('open-restricted').addEventListener('click',()=>{if(!isStaff())return;$('restr
 $('close-restricted').addEventListener('click',()=>{$('restricted-dialog').close();restrictedVersion++;});
 $('refresh-restricted').addEventListener('click',loadRestricted);
 $('open-settings').addEventListener('click',refreshPermissions);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshPermissions();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshPermissions();if(profile && !loading)checkPostNotice();}});
 setInterval(refreshPermissions,30000);
 $('open-reports').addEventListener('click',()=>{if(!profile.canReceiveReports)return;$('reports-dialog').showModal();loadReports();});
 $('refresh-reports').addEventListener('click',loadReports);
@@ -1008,7 +1101,7 @@ $('language').addEventListener('change', () => {
 });
 for (const theme of ['light', 'dark']) {
   $('theme-' + theme).addEventListener('click', () => {
-    setTheme(theme);
+    setTheme(theme, true);
     try { localStorage.setItem(themeKey(), theme); }
     catch { status.textContent = t('เปลี่ยนธีมแล้ว แต่เบราว์เซอร์ไม่อนุญาตให้จำการตั้งค่า'); }
   });

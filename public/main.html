@@ -215,9 +215,15 @@
 </dialog>
 <dialog id="moderation-dialog" aria-labelledby="moderation-heading">
 <div class="dialog-header"><h2 id="moderation-heading"></h2><button id="close-moderation" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div><p id="moderation-description"></p>
-<div id="moderation-reason-field" hidden><label for="moderation-reason" data-i18n="เหตุผลที่แบน">เหตุผลที่แบน</label><textarea id="moderation-reason" rows="3" maxlength="2000" placeholder="อธิบายเหตุผลที่แบน" data-i18n-placeholder="อธิบายเหตุผลที่แบน"></textarea></div>
+<div id="moderation-reason-field" hidden><label id="moderation-reason-label" for="moderation-reason" data-i18n="เหตุผลที่แบน">เหตุผลที่แบน</label><textarea id="moderation-reason" rows="3" maxlength="2000" placeholder="อธิบายเหตุผลที่แบน" data-i18n-placeholder="อธิบายเหตุผลที่แบน"></textarea></div>
 <p id="moderation-status" role="status" aria-live="polite"></p>
 <div class="confirmation-actions"><button id="moderation-confirm" type="button" disabled data-i18n="แน่ใจ">แน่ใจ</button><button id="moderation-cancel" type="button" data-i18n="ไม่">ไม่</button></div>
+</dialog>
+<dialog id="post-notice-dialog" aria-labelledby="post-notice-heading">
+<div class="dialog-header"><h2 id="post-notice-heading" data-i18n="โพสต์ของคุณถูกลบ">โพสต์ของคุณถูกลบ</h2><button id="close-post-notice" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
+<p data-i18n="Admin หรือ Dev ลบโพสต์นี้ด้วยเหตุผลต่อไปนี้">Admin หรือ Dev ลบโพสต์นี้ด้วยเหตุผลต่อไปนี้</p>
+<blockquote id="post-notice-preview"></blockquote>
+<p class="post-notice-label" data-i18n="เหตุผลที่ลบโพสต์">เหตุผลที่ลบโพสต์</p><p id="post-notice-reason"></p>
 </dialog>
 <dialog id="edit-dialog" aria-labelledby="edit-heading">
 <div class="dialog-header"><h2 id="edit-heading" data-i18n="แก้ไขโปรไฟล์">แก้ไขโปรไฟล์</h2><button id="cancel-edit" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
