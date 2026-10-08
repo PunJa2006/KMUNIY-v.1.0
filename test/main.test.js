@@ -441,7 +441,7 @@ test('Guest composer locks other categories, defaults to Q&A, preserves draft an
  const f=await fixture({guest:true});
  await f.click('open-post');
  assert.equal(f.element('post-category').value,'ถาม-ตอบ');assert.equal(f.element('guest-category-note').hidden,false);
- for(const id of ['post-category-placeholder','post-category-market','post-category-lost','post-category-urgent'])assert.equal(f.element(id).disabled,true);
+ for(const id of ['post-category-placeholder','post-category-market','post-category-lost','post-category-general'])assert.equal(f.element(id).disabled,true);
  f.element('post-text').value='Guest question';await f.click('cancel-post');await f.click('open-post');
  assert.equal(f.element('post-text').value,'Guest question');assert.equal(f.element('post-category').value,'ถาม-ตอบ');
  f.element('post-category').value='ขายของ';await f.element('post-form').handlers.submit({preventDefault(){}});
@@ -452,7 +452,7 @@ test('Guest composer locks other categories, defaults to Q&A, preserves draft an
 test('member composer keeps categories unlocked and hides Guest notice',async()=>{
  const f=await fixture();await f.click('open-post');
  assert.equal(f.element('guest-category-note').hidden,true);assert.equal(f.element('post-category').value,'');
- for(const id of ['post-category-placeholder','post-category-market','post-category-lost','post-category-urgent'])assert.equal(f.element(id).disabled,false);
+ for(const id of ['post-category-placeholder','post-category-market','post-category-lost','post-category-general'])assert.equal(f.element(id).disabled,false);
 });
 test('editing a legacy Guest post uses Q&A and retains its text',async()=>{
  const post={id:'p1',own:true,displayName:'Guest',text:'old',category:'ขายของ',media:[]};
@@ -562,4 +562,40 @@ test('post author badge sits between nickname and handle, uses supported roles a
 test('suspended post author never shows a role badge even if old response data contains a role',async()=>{
  const f=await fixture({posts:[{id:'p1',displayName:'Old name',suspended:true,authorHandle:'author1',authorRole:'admin',text:'post',media:[]}]});
  const name=f.element('feed').children[0].children[1];assert.equal(name.children[0].textContent,'ผู้ใช้งานถูกระงับบัญชี');assert.equal(name.children.some(c=>c.className==='role-badge'),false);
+});
+
+test('contact admin preserves drafts on cancel/error, rejects empty input and prevents duplicate sends',async()=>{
+ let reject=true,resolveSend;
+ const f=await fixture({respond:async action=>action==='contact-admin-create'?(reject?Promise.reject(Error('unavailable')):new Promise(resolve=>resolveSend=resolve)):{posts:[]}});
+ await f.click('open-contact-admin');assert.equal(f.element('contact-admin-dialog').open,true);
+ f.element('contact-admin-details').value=' draft ';await f.click('cancel-contact-admin');await f.click('open-contact-admin');assert.equal(f.element('contact-admin-details').value,' draft ');
+ f.element('contact-admin-details').value=' ';await f.element('contact-admin-form').handlers.submit({preventDefault(){}});assert.equal(f.calls.some(c=>c.action==='contact-admin-create'),false);
+ f.element('contact-admin-details').value=' draft ';await f.element('contact-admin-form').handlers.submit({preventDefault(){}});assert.equal(f.element('contact-admin-dialog').open,true);assert.equal(f.element('contact-admin-details').value,' draft ');
+ reject=false;const pending=f.element('contact-admin-form').handlers.submit({preventDefault(){}});await f.element('contact-admin-form').handlers.submit({preventDefault(){}});await f.click('cancel-contact-admin');assert.equal(f.element('contact-admin-dialog').open,true);assert.equal(f.element('contact-admin-fields').disabled,true);
+ resolveSend({reported:true,kind:'general'});await pending;assert.equal(f.element('contact-admin-dialog').open,false);assert.equal(f.element('contact-admin-details').value,'');assert.equal(f.calls.filter(c=>c.action==='contact-admin-create').length,2);assert.equal(f.calls.at(-1).data.details,'draft');
+});
+test('Admin and Dev can select general inbox and render messages without post links',async()=>{
+ for(const role of ['admin','dev']){
+  const f=await fixture({role,respond:async(action,data)=>action==='reports-list'?{reports:data.category==='general'?[{id:'general1',kind:'general',reporter:{displayName:'Member'},details:'<script>literal</script>'}]:[]}:{posts:[]}});
+  await f.click('open-reports');await f.click('reports-category-general');assert.equal(f.calls.at(-1).data.category,'general');assert.equal(f.element('reports-category-general')['aria-pressed'],'true');
+  const card=f.element('reports-list').children[0];assert.equal(card.children[1].textContent,'ทั่วไป');assert.equal(card.children[2].hidden,true);assert.equal(card.children[3].textContent,'<script>literal</script>');assert.deepEqual(Array.from(card.children[0].children[1].children[0].children[1].children,b=>b.textContent),['ลบ']);
+ }
+});
+
+test('announcement composer is staff-only and ordinary members cannot submit a forged category',async()=>{
+ for(const role of [null,'merchant','admin','dev']){
+  const f=await fixture({role});await f.click('open-post');const staff=['admin','dev'].includes(role);assert.equal(f.element('post-category-announcement').hidden,!staff);assert.equal(f.element('post-category-announcement').disabled,!staff);
+  f.element('post-category').value='ประกาศ';f.element('post-text').value='announcement';await f.element('post-form').handlers.submit({preventDefault(){}});assert.equal(f.calls.some(c=>c.action==='post-create'),staff);
+ }
+ const guest=await fixture({guest:true});assert.equal(guest.element('post-category-announcement').hidden,true);assert.equal(guest.element('post-category-general').disabled,true);
+});
+test('announcement ticker renders API announcements independently of category filters and opens their post',async()=>{
+ const post={id:'a1',displayName:'Admin',text:'<script>literal</script>',category:'ประกาศ',media:[]};
+ const f=await fixture({respond:async(action,data)=>action==='posts-list'?{posts:data.category==='ทั้งหมด'?[post]:[],announcements:[post]}:action==='post-detail'?{post,comments:[],likes:[]}:{posts:[]}});
+ assert.equal(f.element('feed').children.length,1);const track=f.element('announcement-track');assert.equal(track.children[0].textContent,'ประกาศ: <script>literal</script>');
+ await f.click('category-general');assert.equal(f.element('feed').children.length,0);assert.equal(track.children[0].textContent,'ประกาศ: <script>literal</script>');
+ await track.children[0].handlers.click();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.element('comments-dialog').open,true);assert.equal(f.calls.at(-1).data.id,'a1');
+});
+test('an empty announcement list clears previous ticker content and restores the welcome message',async()=>{
+ let announcements=[{id:'a1',text:'old'}];const f=await fixture({respond:async()=>({posts:[],announcements})});assert.equal(f.element('announcement-track').children.length,1);announcements=[];await f.click('home');assert.equal(f.element('announcement-track').children.length,0);assert.equal(f.element('announcement-track').textContent,'System : Welcome to my website kub ^_^');
 });

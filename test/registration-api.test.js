@@ -221,7 +221,7 @@ test('foreign, missing, duplicate or oversized attachments cannot be published',
 });
 
 test('all four posting categories are saved and preserved when archived', async () => {
-  for (const category of ['ถาม-ตอบ', 'ขายของ', 'ของหาย', 'แจ้งเตือนด่วน']) {
+  for (const category of ['ทั่วไป', 'ถาม-ตอบ', 'ขายของ', 'ของหาย']) {
     const f = await fixture({ existing: { 'users/email-user': { email: 'member@example.invalid', displayName: 'Member' } } });
     assert.equal((await f.request({ action: 'post-create', text: 'hello', category })).code, 201);
     assert.equal(f.records.get('posts/new-post').category, category);
@@ -975,7 +975,7 @@ test('ban appeals are classified from server restriction state, retain authentic
 test('Guest category restriction uses verified auth and leaves blocked requests without posts, media changes or cooldown',async()=>{
  const id='11111111-1111-4111-8111-111111111111';
  const f=await fixture({guest:true,existing:{'users/email-user':{isGuest:false,displayName:'Guest'},['media/'+id]:{uid:'email-user',type:'image/png',size:10}}});
- for(const category of ['ขายของ','ของหาย','แจ้งเตือนด่วน']){
+ for(const category of ['ทั่วไป','ขายของ','ของหาย']){
   const result=await f.request({action:'post-create',text:'blocked',category,mediaIds:[id],isGuest:false});
   assert.equal(result.code,403);assert.equal(result.value.message,'หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login');
  }
@@ -985,7 +985,7 @@ test('Guest category restriction uses verified auth and leaves blocked requests 
 test('Guest cannot change post category or republish a locked category from archive',async()=>{
  const post={uid:'email-user',text:'original',category:'ถาม-ตอบ',media:[]};
  const f=await fixture({guest:true,existing:{'users/email-user':{isGuest:true,displayName:'Guest'},'posts/p1':post,'users/email-user/archive/old':{...post,category:'ขายของ'}}});
- for(const category of ['ขายของ','ของหาย','แจ้งเตือนด่วน'])assert.equal((await f.request({action:'post-update',id:'p1',text:'changed',category})).code,403);
+ for(const category of ['ทั่วไป','ขายของ','ของหาย'])assert.equal((await f.request({action:'post-update',id:'p1',text:'changed',category})).code,403);
  assert.equal(f.records.get('posts/p1').text,'original');
  assert.equal((await f.request({action:'post-restore',id:'old'})).code,403);assert.equal(f.records.has('users/email-user/archive/old'),true);assert.equal(f.records.has('posts/old'),false);
  assert.equal((await f.request({action:'post-update',id:'old',text:'converted',category:'ถาม-ตอบ'})).code,200);
@@ -1079,4 +1079,45 @@ test('own, archive, profile and saved feeds expose the same current post author 
  const f=await fixture({existing,authUid:'dev'});assert.equal((await f.request({action:'saved-list'})).value.posts[0].authorRole,'admin');
  assert.equal((await f.request({action:'author-profile',id:'staff'})).value.posts[0].authorRole,'admin');
  f.setUser('admin');assert.equal((await f.request({action:'my-posts'})).value.posts[0].authorRole,'admin');assert.equal((await f.request({action:'archive-list'})).value.posts[0].authorRole,'admin');assert.equal((await f.request({action:'post-detail',id:'private'})).value.post.role,'admin');
+});
+
+test('contact admin uses authenticated identity and routes to general shared inbox for Admin and Dev',async()=>{
+ const f=await fixture({existing:roleRecords()});
+ const sent=await f.request({action:'contact-admin-create',details:'  Please help <script>text</script>  ',kind:'usage',recipientUid:'forged',reporterUid:'forged'});assert.equal(sent.code,201);assert.equal(sent.value.kind,'general');
+ const [key,report]=[...f.records.entries()].find(([key])=>key.startsWith('users/dev/reports/'));const id=key.split('/').at(-1);assert.equal(report.reporterUid,'email-user');assert.equal(report.kind,'general');assert.equal(report.details,'Please help <script>text</script>');
+ assert.equal((await f.request({action:'reports-list',category:'general'})).code,403);
+ for(const uid of ['admin','dev']){f.setUser(uid);const inbox=await f.request({action:'reports-list',category:'general'});assert.equal(inbox.code,200);assert.equal(inbox.value.reports.length,1);assert.equal(inbox.value.reports[0].id,id);assert.equal(inbox.value.reports[0].post,undefined);assert.equal(inbox.value.reports[0].reporter.email,undefined);}
+ f.setUser('admin');assert.equal((await f.request({action:'report-delete',id})).code,200);assert.equal(f.records.has(key),false);
+});
+test('contact messages validate text, use shared report spam limits, and preserve account restrictions',async()=>{
+ const f=await fixture({existing:roleRecords()});
+ for(const details of [undefined,123,' ','x'.repeat(2001)])assert.equal((await f.request({action:'contact-admin-create',details})).code,400);
+ for(let i=0;i<15;i++)assert.equal((await f.request({action:i%2?'usage-report-create':'contact-admin-create',details:'message '+i})).code,201);
+ assert.equal((await f.request({action:'contact-admin-create',details:'too many'})).code,429);
+ const unregistered=await fixture();assert.equal((await unregistered.request({action:'contact-admin-create',details:'hello'})).code,403);
+ const banned=await fixture({existing:{...roleRecords(),'restrictions/email-user':{banned:true}}});assert.equal((await banned.request({action:'contact-admin-create',details:'hello'})).value.code,'ACCOUNT_BANNED');
+ const guest=await fixture({existing:{...roleRecords(),'users/email-user':{isGuest:true,displayName:'guest_123'}},guest:true});assert.equal((await guest.request({action:'contact-admin-create',details:'hello'})).value.kind,'general');
+});
+
+test('only current Admin and Dev can publish announcements, including through edit and archive restore',async()=>{
+ for(const uid of ['email-user','seller','admin','dev']){
+  const f=await fixture({existing:{...roleRecords(),'users/seller':{email:'seller@example.invalid',displayName:'Seller'},'roles/seller':{role:'merchant'}},authUid:uid});const staff=['admin','dev'].includes(uid);
+  assert.equal((await f.request({action:'post-create',text:'announcement',category:'ประกาศ',role:'dev'})).code,staff?201:403);
+  if(staff){assert.equal((await f.request({action:'post-update',id:'new-post',text:'edited',category:'ประกาศ'})).code,200);await f.request({action:'post-archive',id:'new-post'});assert.equal((await f.request({action:'post-restore',id:'new-post'})).code,200);}
+ }
+ const revoked=await fixture({existing:{...roleRecords(),'posts/a1':{uid:'admin',text:'old',category:'ประกาศ'},'users/admin/archive/a2':{uid:'admin',text:'archived',category:'ประกาศ'}},authUid:'admin'});revoked.records.delete('roles/admin');
+ assert.equal((await revoked.request({action:'post-update',id:'a1',text:'changed',category:'ทั่วไป'})).code,403);assert.equal((await revoked.request({action:'post-restore',id:'a2'})).code,403);assert.equal(revoked.records.get('posts/a1').text,'old');
+ const ordinary=await fixture({existing:{...roleRecords(),'posts/p1':{uid:'email-user',text:'original',category:'ทั่วไป'}}});assert.equal((await ordinary.request({action:'post-update',id:'p1',text:'upgrade',category:'ประกาศ'})).code,403);assert.equal(ordinary.records.get('posts/p1').category,'ทั่วไป');
+});
+test('announcements reach every reader in both feed and ticker and follow edits, archive, restore and deletion',async()=>{
+ const f=await fixture({existing:roleRecords(),authUid:'admin'});assert.equal((await f.request({action:'post-create',text:'First',category:'ประกาศ'})).code,201);
+ f.setUser('email-user');let data=(await f.request({action:'posts-list'})).value;assert.equal(data.posts[0].category,'ประกาศ');assert.equal(data.announcements[0].text,'First');assert.equal((await f.request({action:'posts-list',category:'ทั่วไป'})).value.announcements[0].text,'First');
+ f.setUser('admin');await f.request({action:'post-update',id:'new-post',text:'Edited',category:'ประกาศ'});assert.equal((await f.request({action:'posts-list'})).value.announcements[0].text,'Edited');
+ await f.request({action:'post-archive',id:'new-post'});data=(await f.request({action:'posts-list'})).value;assert.equal(data.posts.some(post=>post.id==='new-post'),false);assert.equal(data.announcements.length,0);
+ await f.request({action:'post-restore',id:'new-post'});assert.equal((await f.request({action:'posts-list'})).value.announcements.length,1);await f.request({action:'post-delete',id:'new-post'});assert.equal((await f.request({action:'posts-list'})).value.announcements.length,0);
+ const guest=await fixture({existing:{...roleRecords(),'users/email-user':{isGuest:true,displayName:'Guest'},'posts/a1':{uid:'admin',text:'Public announcement',category:'ประกาศ'}},guest:true});data=(await guest.request({action:'posts-list',category:'ประกาศ'})).value;assert.equal(data.posts.length,1);assert.equal(data.announcements[0].text,'Public announcement');
+});
+test('removed urgent category is read as General without removing old posts and cannot be used for new posts',async()=>{
+ const f=await fixture({existing:{...roleRecords(),'posts/old':{uid:'email-user',text:'Old urgent post',category:'แจ้งเตือนด่วน'},'posts/new':{uid:'email-user',text:'General post',category:'ทั่วไป'}}});const data=(await f.request({action:'posts-list',category:'ทั่วไป'})).value;assert.equal(data.posts.length,2);assert.equal(data.posts.every(p=>p.category==='ทั่วไป'),true);assert.equal((await f.request({action:'post-detail',id:'old'})).value.post.category,'ทั่วไป');
+ assert.equal((await f.request({action:'post-create',category:'แจ้งเตือนด่วน',text:'rejected'})).code,400);assert.equal((await f.request({action:'posts-list',category:'แจ้งเตือนด่วน'})).code,400);assert.equal(f.records.has('posts/old'),true);
 });
