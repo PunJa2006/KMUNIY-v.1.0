@@ -1,0 +1,10 @@
+.env*
+local-env.example
+media-data
+node_modules
+outputs
+test
+work
+releases
+*.zip
+*service-account*
