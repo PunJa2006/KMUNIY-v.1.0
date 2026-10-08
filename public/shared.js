@@ -1,3 +1,4 @@
+export {uploadMedia} from './media-upload.js';
 export { createLogoutConfirmation } from './logout-confirmation.js';
 export { hashtagParts } from './hashtags.js';
 import { t, localizeError } from './i18n.js';

@@ -1,4 +1,4 @@
-import { createLogoutConfirmation, connect, api, status, showError, t, localizeError } from './shared.js';
+import { uploadMedia, createLogoutConfirmation, connect, api, status, showError, t, localizeError } from './shared.js';
 const $ = id => document.getElementById(id);
 let sdk, profile, selectedFile = null, uploadedId = null, previewUrl = null, busy = false;
 let previewVersion = 0;
@@ -60,9 +60,7 @@ $('setup-form').addEventListener('submit', async event => {
   try {
     if (selectedFile && !uploadedId) {
       status.textContent = t('กำลังอัปโหลดรูปโปรไฟล์…');
-      const response = await fetch('/api/media', { method: 'POST', headers: { Authorization: 'Bearer ' + await sdk.auth.currentUser.getIdToken(), 'Content-Type': selectedFile.type }, body: selectedFile });
-      const result = await response.json();
-      if (!response.ok) throw new Error(localizeError(result.message) || t('อัปโหลดรูปไม่สำเร็จ'));
+      const result = await uploadMedia(selectedFile,sdk.auth.currentUser);
       uploadedId = result.id;
     }
     status.textContent = t('กำลังบันทึกโปรไฟล์…');
@@ -80,3 +78,5 @@ const confirmLogout=createLogoutConfirmation({
 });
 $('setup-logout').addEventListener('click',()=>{if(!busy && sdk)confirmLogout();});
 try { sdk = await connect(); await load(); } catch (error) { showError(error); }
+
+$('close-logout').addEventListener('click',()=>$('cancel-logout').click());

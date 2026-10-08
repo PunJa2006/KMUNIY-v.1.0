@@ -156,9 +156,9 @@ const english = {
   "ยังไม่มีโพสต์ที่ใช้ #{tag}": "No posts with #{tag}.",
   "ประกาศจากมหาวิทยาลัย": "University announcements",
   "เมนูหลัก": "Main menu",
-  "เข้าสู่ระบบ | Mairu KMUTNB Community": "Sign in | Mairu KMUTNB Community",
-  "สมัครสมาชิก | Mairu KMUTNB Community": "Sign up | Mairu KMUTNB Community",
-  "สร้างโปรไฟล์ | Mairu KMUTNB Community": "Create profile | Mairu KMUTNB Community",
+  "เข้าสู่ระบบ | Kmunity KMTNB Community": "Sign in | Kmunity KMTNB Community",
+  "สมัครสมาชิก | Kmunity KMTNB Community": "Sign up | Kmunity KMTNB Community",
+  "สร้างโปรไฟล์ | Kmunity KMTNB Community": "Create profile | Kmunity KMTNB Community",
   "เข้าสู่ระบบ": "Sign in",
   "ยินดีต้อนรับกลับมา": "Welcome back",
   "ข้อมูลเข้าสู่ระบบ": "Sign-in details",
@@ -193,7 +193,7 @@ const english = {
   "ฉัน": "Me",
   "ตั้งค่า": "Settings",
   "ชุมชนของคุณ": "Your community",
-  "Mairu KMUTNB Community กลับหน้าแรกและรีเซ็ตฟีด": "Mairu KMUTNB Community: home and refresh feed",
+  "Kmunity KMTNB Community กลับหน้าแรกและรีเซ็ตฟีด": "Kmunity KMTNB Community: home and refresh feed",
   "ตรามหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ": "King Mongkut’s University of Technology North Bangkok emblem",
   "กำลังตรวจสอบการเข้าสู่ระบบ…": "Checking your session…",
   "แก้ไขโปรไฟล์": "Edit profile",
@@ -372,7 +372,7 @@ const english = {
 
 export const LANGUAGE_KEY = 'community-language';
 export function getLanguage() {
-  try { return localStorage.getItem(LANGUAGE_KEY) === 'en' ? 'en' : 'th'; } catch { return 'th'; }
+  try { return localStorage.getItem(LANGUAGE_KEY) === 'th' ? 'th' : 'en'; } catch { return 'en'; }
 }
 export function setLanguage(language) {
   if (!['th', 'en'].includes(language)) throw new Error('Unsupported language');

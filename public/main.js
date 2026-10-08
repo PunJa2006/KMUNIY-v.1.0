@@ -1,4 +1,4 @@
-import { createLogoutConfirmation, connect, api, status, showError, t, localizeError, getLanguage, setLanguage, dateLocale, hashtagParts } from './shared.js';
+import { uploadMedia, createLogoutConfirmation, connect, api, status, showError, t, localizeError, getLanguage, setLanguage, dateLocale, hashtagParts } from './shared.js';
 import { createSearchHistory } from './search-history.js';
 const $ = id => document.getElementById(id);
 const personName = person => person?.suspended ? t('ผู้ใช้งานถูกระงับบัญชี') : person?.displayName || '';
@@ -38,6 +38,9 @@ for (const [id, category] of Object.entries(categoryButtons)) {
 }
 let loading = false, posting = false, editing = false, redirecting = false;
 let feedVersion = 0;
+const postIdentityObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(entries => {
+  for (const { target } of entries) target.dataset.clipped = String(target.scrollWidth > target.clientWidth + 1);
+});
 let postAvailableAt = 0, postCooldownTimer = null, editingPost = null;
 let retainedMedia = [], postEditVersion = 0;
 const postEditUrls = [];
@@ -70,10 +73,10 @@ async function loadAvatar(image, id, urls) {
     const url = URL.createObjectURL(blob); urls.push(url); image.src = url;
   } catch {}
 }
-function clearPhotoDraft() {
+function clearPhotoDraft(clearInput = true) {
   if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
   photoPreviewUrl = null; selectedPhoto = null; uploadedPhotoId = null;
-  $('edit-photo').value = '';
+  if (clearInput) $('edit-photo').value = '';
   releaseUrls(editPhotoUrls);
 }
 $('edit-photo-picker').addEventListener('click', () => {
@@ -82,7 +85,7 @@ $('edit-photo-picker').addEventListener('click', () => {
 });
 $('edit-photo').addEventListener('change', () => {
   const file = $('edit-photo').files[0];
-  clearPhotoDraft();
+  clearPhotoDraft(false);
   if (!file) return;
   if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
     $('edit-status').textContent = t('เลือกรูป JPG, PNG, GIF หรือ WebP ไม่เกิน 5 MB');
@@ -102,10 +105,10 @@ $('remove-photo').addEventListener('change', () => {
 });
 let selectedFiles = [], uploadedFiles = [], previewUrls = [], feedUrls = [];
 function releaseUrls(urls) { for (const url of urls) URL.revokeObjectURL(url); urls.length = 0; }
-function resetFiles() {
+function resetFiles(clearInput = true) {
   releaseUrls(previewUrls);
   selectedFiles = []; uploadedFiles = [];
-  $('post-files').value = '';
+  if (clearInput) $('post-files').value = '';
   $('media-preview').replaceChildren();
 }
 function mediaElement(type) {
@@ -126,7 +129,8 @@ async function loadMedia(item, container, version) {
     const media = mediaElement(item.type);
     media.src = url;
     container.replaceChildren(media);
-  } catch { if (version === feedVersion) container.textContent = t('โหลดไฟล์แนบไม่ได้ กรุณารีเฟรชอีกครั้ง'); }
+    container.setAttribute('aria-busy', 'false');
+  } catch { if (version === feedVersion) { container.setAttribute('aria-busy', 'false'); container.textContent = t('โหลดไฟล์แนบไม่ได้ กรุณารีเฟรชอีกครั้ง'); } }
 }
 $('post-files').addEventListener('change', () => {
   const files = [...$('post-files').files];
@@ -136,7 +140,7 @@ $('post-files').addEventListener('change', () => {
     $('post-status').textContent = t('เลือกไฟล์ที่รองรับไม่เกิน 4 ไฟล์ รวมไม่เกิน 50 MB');
     return;
   }
-  resetFiles();
+  resetFiles(false);
   selectedFiles = files;
   $('post-status').textContent = '';
   for (const file of files) {
@@ -174,18 +178,19 @@ async function refreshPermissions(){
 function themeKey() { return `community-theme:${sdk.auth.currentUser.uid}`; }
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
-  $('theme').value = document.documentElement.dataset.theme;
+  for (const value of ['light', 'dark']) $('theme-' + value).setAttribute('aria-pressed', String(value === document.documentElement.dataset.theme));
   try { localStorage.setItem('community-last-theme', document.documentElement.dataset.theme); } catch {}
 }
 function updatePostCategories() {
   const guest = sdk?.auth.currentUser?.isAnonymous === true;
-  for (const id of ['post-category-placeholder', 'post-category-general', 'post-category-market', 'post-category-lost']) $(id).disabled = guest;
+  for (const id of ['post-category-placeholder', 'post-category-market', 'post-category-lost']) $(id).disabled = guest;
+  $('post-category-general').disabled = false;
   const staff=!guest && ['dev','admin'].includes(profile?.role);
   $('post-category-announcement').hidden=!staff;
   $('post-category-announcement').disabled=!staff;
   if(!staff && $('post-category').value==='ประกาศ')$('post-category').value='';
   $('guest-category-note').hidden = !guest;
-  if (guest) $('post-category').value = 'ถาม-ตอบ';
+  if (guest && !['ทั่วไป', 'ถาม-ตอบ'].includes($('post-category').value)) $('post-category').value = 'ถาม-ตอบ';
 }
 function renderProfile() {
   updatePostCategories();
@@ -210,6 +215,7 @@ async function load() {
     renderProfile();
     try { setTheme(localStorage.getItem(themeKey())); } catch { setTheme('light'); }
     $('open-reports').hidden = !profile.canReceiveReports;
+    finishInitialLoading();
     $('app').hidden = false;
     status.textContent = '';
     await loadFeed();
@@ -219,7 +225,7 @@ async function load() {
       await sdk.signOut(sdk.auth);
       location.replace('/?unregistered=1');
     } else { showError(error); $('retry').hidden = false; }
-  } finally { loading = false; }
+  } finally { loading = false; if (!redirecting) finishInitialLoading(); }
 }
 
 let socialVersion = 0, socialMediaVersion = 0, commentPostId = null, commenting = false;
@@ -294,12 +300,15 @@ function openAuthor(id, handle = null) {
 }
 function postAuthorName(container, person, handle, role) {
   container.className = 'post-author-line';
-  const nickname = document.createElement('span'); nickname.textContent = personName(person);
+  const nickname = document.createElement('span'); nickname.className = 'post-author-nickname'; nickname.textContent = personName(person);
+  container.title = personName(person) + (handle ? ' @' + handle : '');
   container.replaceChildren(nickname);
   if (!person.suspended && ['dev','admin','merchant'].includes(role)) {
     const badge = document.createElement('span'); badge.className = 'role-badge'; roleBadge(badge, role); container.append(badge);
   }
-  if (handle) { const username = document.createElement('span'); username.className = 'post-author-handle'; username.textContent = '@' + handle; container.append(username); }
+  let username = null;
+  if (handle) { username = document.createElement('span'); username.className = 'post-author-handle'; username.textContent = '@' + handle; container.append(username); }
+  return { nickname, username };
 }
 function personCard(person, postId = null) {
   const row = document.createElement('div');
@@ -412,6 +421,7 @@ $('comment-form').addEventListener('submit', async event => {
 });
 
 function renderPosts(posts, targetView) {
+  postIdentityObserver?.disconnect();
   const feed = $('feed');
   feed.replaceChildren();
   for (const post of posts) {
@@ -427,7 +437,9 @@ function renderPosts(posts, targetView) {
     article.append(authorButton);
     loadAvatar(photo, post.authorPhotoId, feedPhotoUrls);
     const heading = document.createElement('h3');
-    postAuthorName(heading, post, post.authorHandle, post.authorRole);
+    const identity = postAuthorName(heading, post, post.authorHandle, post.authorRole);
+    postIdentityObserver?.observe(identity.nickname);
+    if (identity.username) postIdentityObserver?.observe(identity.username);
     const time = document.createElement('p');
     time.className = 'post-time';
     time.textContent = post.createdAt ? new Date(post.createdAt).toLocaleString(dateLocale()) : '';
@@ -437,12 +449,21 @@ function renderPosts(posts, targetView) {
     const category = document.createElement('p');
     category.className = 'post-category';
     category.dataset.category = post.category || '';
-    category.textContent = t('หมวดหมู่: ') + t(post.category || 'ยังไม่ระบุหมวดหมู่');
+    const categoryPrefix = document.createElement('span'), categoryLabel = document.createElement('span');
+    categoryPrefix.className = 'post-category-prefix'; categoryPrefix.textContent = t('หมวดหมู่: ');
+    categoryLabel.textContent = t(post.category || 'ยังไม่ระบุหมวดหมู่');
+    category.append(categoryPrefix, categoryLabel);
+    category.setAttribute('aria-label', categoryPrefix.textContent + categoryLabel.textContent);
     article.append(heading, postTools(post, category, targetView), time, content);
     for (const item of post.media || []) {
       const container = document.createElement('div');
       container.className = 'post-attachment';
-      container.textContent = t('กำลังโหลดไฟล์แนบ…');
+      container.setAttribute('aria-busy', 'true');
+      const mediaStatus = document.createElement('span');
+      mediaStatus.className = 'sr-only'; mediaStatus.setAttribute('role', 'status');
+      mediaStatus.textContent = t('กำลังโหลดไฟล์แนบ…');
+      const placeholder = skeletonBlock('media'); placeholder.setAttribute('aria-hidden', 'true');
+      container.append(mediaStatus, placeholder);
       article.append(container);
       loadMedia(item, container, feedVersion);
     }
@@ -468,28 +489,90 @@ function renderPosts(posts, targetView) {
   }
   $('feed-status').textContent = posts.length ? (targetView === 'home' ? '' : t('แสดง {count} โพสต์', { count: posts.length })) : targetView === 'saved' ? t('ยังไม่มีโพสต์ที่บันทึกไว้') : targetView === 'archive' ? t('ยังไม่มีโพสต์ในคลัง') : targetView === 'me' ? t('คุณยังไม่มีโพสต์') : targetView === 'author' ? t('ยังไม่มีโพสต์ที่เผยแพร่') : selectedHashtag ? t('ยังไม่มีโพสต์ที่ใช้ #{tag}', { tag: selectedHashtag }) : selectedCategory === 'ทั้งหมด' ? t('ยังไม่มีโพสต์ เริ่มโพสต์แรกได้เลย') : t('ยังไม่มีโพสต์ในหมวด ') + t(selectedCategory);
 }
-function renderAnnouncements(announcements=[]){
-  const track=$('announcement-track'),accessible=$('announcement-accessible');
-  const fallback='System : Welcome to my website kub ^_^';
+let currentAnnouncements = [];
+function renderAnnouncements(announcements = []) {
+  currentAnnouncements = announcements;
+  const track = $('announcement-track'), accessible = $('announcement-accessible');
+  const fallback = 'System : Welcome to my website kub ^_^';
+  const items = announcements.length ? announcements : [{ text: fallback }];
+  const label = post => announcements.length ? t('ประกาศ') + ': ' + (post.text || t('ประกาศพร้อมไฟล์แนบ')).replace(/\s+/g, ' ') : fallback;
+  accessible.textContent = items.map(label).join(' · ');
   track.replaceChildren();
-  if(!announcements.length){track.textContent=fallback;accessible.textContent=fallback;return;}
-  track.textContent='';
-  accessible.textContent=announcements.map(post=>t('ประกาศ')+': '+(post.text || t('ประกาศพร้อมไฟล์แนบ'))).join(' · ');
-  for(const post of announcements){
-    const button=document.createElement('button');button.type='button';button.className='announcement-link';
-    button.textContent=t('ประกาศ')+': '+(post.text || t('ประกาศพร้อมไฟล์แนบ')).replace(/\s+/g,' ');
-    button.addEventListener('click',()=>openSocial('comments',post.id));
-    track.append(button);
-  }
+  const makeRepeat = duplicate => {
+    const repeat = document.createElement('span');
+    repeat.className = 'announcement-repeat';
+    if (duplicate) repeat.setAttribute('aria-hidden', 'true');
+    for (const post of items) {
+      const item = document.createElement(post.id ? 'button' : 'span');
+      item.className = post.id ? 'announcement-link' : 'announcement-item';
+      item.textContent = label(post);
+      if (post.id) {
+        item.type = 'button';
+        if (duplicate) item.tabIndex = -1;
+        item.addEventListener('click', () => openSocial('comments', post.id));
+      }
+      repeat.append(item);
+    }
+    return repeat;
+  };
+  const first = document.createElement('span');
+  first.className = 'announcement-group';
+  first.append(makeRepeat(false));
+  track.append(first);
+  const unitWidth = first.scrollWidth || 1;
+  const repeats = Math.max(1, Math.ceil(($('university-announcement').clientWidth || 1) / unitWidth));
+  for (let index = 1; index < repeats; index++) first.append(makeRepeat(true));
+  const second = document.createElement('span');
+  second.className = 'announcement-group';
+  second.setAttribute('aria-hidden', 'true');
+  for (let index = 0; index < repeats; index++) second.append(makeRepeat(true));
+  track.append(second);
+  track.setAttribute('style', '--announcement-duration: ' + Math.max(1, (first.scrollWidth || 720) / 45) + 's');
 }
+const announcementObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => renderAnnouncements(currentAnnouncements));
+announcementObserver?.observe($('university-announcement'));
+document.fonts?.ready.then(() => renderAnnouncements(currentAnnouncements));
+
+function skeletonBlock(kind) {
+  const block = document.createElement('span');
+  block.className = 'skeleton-block skeleton-' + kind;
+  return block;
+}
+function postSkeleton(withMedia) {
+  const card = document.createElement('article');
+  card.className = 'loading-card'; card.setAttribute('aria-hidden', 'true');
+  const header = document.createElement('div'); header.className = 'loading-card-header';
+  const identity = document.createElement('div'); identity.className = 'loading-identity';
+  identity.append(skeletonBlock('name'), skeletonBlock('date'));
+  header.append(skeletonBlock('avatar'), identity, skeletonBlock('category'));
+  const text = document.createElement('div'); text.className = 'loading-text';
+  text.append(skeletonBlock('line'), skeletonBlock('line-short'));
+  card.append(header, text);
+  if (withMedia) card.append(skeletonBlock('media'));
+  const actions = document.createElement('div'); actions.className = 'loading-actions';
+  actions.append(skeletonBlock('action'), skeletonBlock('action'), skeletonBlock('action'));
+  card.append(actions);
+  return card;
+}
+function showFeedSkeleton() {
+  postIdentityObserver?.disconnect();
+  $('feed').replaceChildren(postSkeleton(true), postSkeleton(false), postSkeleton(false));
+  $('feed-status').className = 'sr-only';
+  $('feed-status').textContent = t('กำลังโหลดโพสต์…');
+}
+function finishInitialLoading() {
+  $('initial-loading').hidden = true;
+  status.className = '';
+}
+
 async function loadFeed() {
+  if (view === 'search' || view === 'settings') return;
   const version = ++feedVersion;
   const targetView = view;
   $('feed').setAttribute('aria-busy', 'true');
   releaseUrls(feedUrls);
   releaseUrls(feedPhotoUrls);
-  $('feed').replaceChildren();
-  $('feed-status').textContent = t('กำลังโหลดโพสต์…');
+  showFeedSkeleton();
   try {
     const data = await call(targetView === 'saved' ? 'saved-list' : targetView === 'author' ? 'author-profile' : targetView === 'archive' ? 'archive-list' : targetView === 'me' ? 'my-posts' : 'posts-list', targetView === 'author' ? (authorHandle ? { handle: authorHandle } : { id: authorPostId }) : targetView === 'home' ? { category: selectedCategory, ...(selectedHashtag ? { hashtag: selectedHashtag } : {}) } : {});
     if (version === feedVersion) {
@@ -508,15 +591,32 @@ async function loadFeed() {
       renderPosts(data.posts, targetView);
       if(targetView==='saved')savedSignature=JSON.stringify(data.posts);
     }
-  } catch (error) { if (version === feedVersion) $('feed-status').textContent = localizeError(error.message); }
-  finally { if (version === feedVersion) $('feed').setAttribute('aria-busy', 'false'); }
+  } catch (error) {
+    if (version === feedVersion) {
+      $('feed').replaceChildren();
+      $('feed-status').textContent = localizeError(error.message);
+    }
+  } finally {
+    if (version === feedVersion) {
+      $('feed').setAttribute('aria-busy', 'false');
+      $('feed-status').className = '';
+    }
+  }
 }
 function switchView(next) {
+  if (next !== view && (typeof matchMedia !== 'function' || !matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+    $('community-content').getAnimations?.().forEach(animation => animation.cancel());
+    $('community-content').animate?.([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 320, easing: 'cubic-bezier(.2,.7,.25,1)' });
+  }
+  if (view === 'search' && next !== 'search') closeSearch();
   view = next;
+  $('search-page').hidden = view !== 'search';
+  $('feed-view').hidden = view === 'search' || view === 'settings';
+  $('settings-page').hidden = view !== 'settings';
   if(savedRefreshTimer!==null){clearInterval(savedRefreshTimer);savedRefreshTimer=null;}
   if(view==='saved')savedRefreshTimer=setInterval(refreshSaved,15000);
   updateAnnouncement();
-  for (const [id, target] of [['home', 'home'], ['me', 'me']]) $(id).setAttribute('aria-current', view === target ? 'page' : 'false');
+  for (const [id, target] of [['home', 'home'], ['open-search', 'search'], ['me', 'me'], ['open-settings', 'settings']]) $(id).setAttribute('aria-current', view === target ? 'page' : 'false');
   $('me-profile').hidden = view !== 'me';
   $('author-profile').hidden = true;
   releaseUrls(authorUrls);
@@ -525,7 +625,11 @@ function switchView(next) {
   closeFilter();
   $('feed-heading').textContent = view === 'saved' ? t('โพสต์ที่บันทึกไว้') : view === 'me' ? t('โพสต์ของฉัน') : view === 'archive' ? t('คลังของฉัน · เห็นเฉพาะฉัน') : selectedCategory === 'ทั้งหมด' ? t('ฟีดโพสต์') : t('ฟีดโพสต์ · ') + t(selectedCategory);
   status.textContent = '';
-  loadFeed();
+  if (view === 'search' || view === 'settings') {
+    feedVersion++;
+    releaseUrls(feedUrls); releaseUrls(feedPhotoUrls);
+    $('feed').setAttribute('aria-busy', 'false');
+  } else loadFeed();
 }
 $('brand-home').addEventListener('click', event => {
   event.preventDefault();
@@ -577,10 +681,8 @@ function closeSearch() {
   cancelSearchTimer();
   searchVersion++; trendingVersion++;
   releaseUrls(searchPhotoUrls);
-  $('search-dialog').close();
 }
-$('search-dialog').addEventListener('close', () => { $('search-status').textContent = ''; cancelSearchTimer(); searchVersion++; trendingVersion++; releaseUrls(searchPhotoUrls); });
-$('close-search').addEventListener('click', closeSearch);
+
 function updateHashtagFilter() {
   $('hashtag-filter').hidden = view !== 'home' || !selectedHashtag;
   $('selected-hashtag').textContent = selectedHashtag ? '#' + selectedHashtag : '';
@@ -604,6 +706,7 @@ function renderTaggedText(container, text) {
   }
 }
 $('open-search').addEventListener('click', async () => {
+  switchView('search');
   cancelSearchTimer();
   searchVersion++; releaseUrls(searchPhotoUrls);
   $('search-results').replaceChildren();
@@ -612,11 +715,11 @@ $('open-search').addEventListener('click', async () => {
   $('search-status').textContent = '';
   $('trending-tags').replaceChildren();
   $('trending-status').textContent = t('กำลังโหลด…');
-  $('search-dialog').showModal(); $('search-input').focus();
+  $('search-heading').focus();
   const version = ++trendingVersion;
   try {
     const data = await call('trending-tags');
-    if (version !== trendingVersion || !$('search-dialog').open) return;
+    if (version !== trendingVersion || view !== 'search') return;
     for (const item of data.tags) {
       const row = document.createElement('li'), button = document.createElement('button');
       button.type = 'button'; button.className = 'trending-tag';
@@ -626,13 +729,13 @@ $('open-search').addEventListener('click', async () => {
       row.append(button); $('trending-tags').append(row);
     }
     $('trending-status').textContent = data.tags.length ? '' : t('ยังไม่มีแฮชแท็กยอดนิยมในช่วงนี้');
-  } catch (error) { if (version === trendingVersion && $('search-dialog').open) $('trending-status').textContent = localizeError(error.message); }
+  } catch (error) { if (version === trendingVersion && view === 'search') $('trending-status').textContent = localizeError(error.message); }
 });
 function suggestUsers(event) {
   cancelSearchTimer(); searchVersion++; releaseUrls(searchPhotoUrls);
   $('search-results').replaceChildren(); $('search-status').textContent = '';
   const query = $('search-input').value.trim().replace(/^@/, '');
-  if (event?.isComposing || !$('search-dialog').open || !/^[a-z0-9_.^]{1,24}$/i.test(query)) return;
+  if (event?.isComposing || view !== 'search' || !/^[a-z0-9_.^]{1,24}$/i.test(query)) return;
   searchTimer = setTimeout(() => { searchTimer = null; runSearch({ live: true }); }, 200);
 }
 $('search-input').addEventListener('input', suggestUsers);
@@ -642,7 +745,7 @@ $('search-form').addEventListener('submit', event => { event.preventDefault(); r
 async function runSearch({ live = false } = {}) {
   cancelSearchTimer();
   const query = $('search-input').value.trim();
-  if (!query || !$('search-dialog').open) return;
+  if (!query || view !== 'search') return;
   if (query.startsWith('#')) {
     const parts = hashtagParts(query);
     if (parts.length === 1 && parts[0].tag && parts[0].text === query) { rememberSearch('query', query); selectHashtag(parts[0].tag); return; }
@@ -654,7 +757,7 @@ async function runSearch({ live = false } = {}) {
   try {
     const searchedHistory = currentSearchHistory();
     const data = await call('search-users', { query });
-    if (version !== searchVersion || !$('search-dialog').open) return;
+    if (version !== searchVersion || view !== 'search') return;
     if (!live) {
       searchedHistory?.remember({ kind: 'query', value: query });
       if (searchedHistory === currentSearchHistory()) renderSearchHistory();
@@ -670,7 +773,7 @@ async function runSearch({ live = false } = {}) {
       $('search-results').append(button); loadAvatar(photo, person.photoId, searchPhotoUrls);
     }
     $('search-status').textContent = data.users.length ? t('พบ {count} ผู้ใช้', { count: data.users.length }) : t('ไม่พบผู้ใช้');
-  } catch (error) { if (version === searchVersion && $('search-dialog').open) $('search-status').textContent = localizeError(error.message); }
+  } catch (error) { if (version === searchVersion && view === 'search') $('search-status').textContent = localizeError(error.message); }
 }
 
 
@@ -724,6 +827,7 @@ function bindMessageDialog(prefix,action,emptyMessage,successMessage){
   let sending=false;
   $('open-'+prefix).addEventListener('click',()=>{
     if(sending)return;
+    
     $(prefix+'-status').textContent='';$(prefix+'-dialog').showModal();$(prefix+'-details').focus();
   });
   $('cancel-'+prefix).addEventListener('click',()=>{if(!sending)$(prefix+'-dialog').close();});
@@ -753,7 +857,7 @@ $('report-form').addEventListener('submit',async event=>{
   catch(error){$('report-status').textContent=localizeError(error.message);}
   finally{reporting=false;$('report-fields').disabled=false;}
 });
-$('open-saved').addEventListener('click',()=>{$('settings-dialog').close();switchView('saved');});
+$('open-saved').addEventListener('click',()=>{switchView('saved');});
 async function refreshSaved(){
   if(view!=='saved' || document.hidden || loading || $('feed').getAttribute('aria-busy')==='true')return;
   const version=feedVersion;
@@ -879,13 +983,13 @@ async function loadRestricted(){
     $('restricted-status').textContent=result.users.length?'':t('ยังไม่มีผู้ใช้ที่ถูกจำกัด');
   }catch(error){if(version===restrictedVersion)$('restricted-status').textContent=localizeError(error.message);}
 }
-$('open-restricted').addEventListener('click',()=>{if(!isStaff())return;$('settings-dialog').close();$('restricted-dialog').showModal();loadRestricted();});
+$('open-restricted').addEventListener('click',()=>{if(!isStaff())return;$('restricted-dialog').showModal();loadRestricted();});
 $('close-restricted').addEventListener('click',()=>{$('restricted-dialog').close();restrictedVersion++;});
 $('refresh-restricted').addEventListener('click',loadRestricted);
 $('open-settings').addEventListener('click',refreshPermissions);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshPermissions();});
 setInterval(refreshPermissions,30000);
-$('open-reports').addEventListener('click',()=>{if(!profile.canReceiveReports)return;$('settings-dialog').close();$('reports-dialog').showModal();loadReports();});
+$('open-reports').addEventListener('click',()=>{if(!profile.canReceiveReports)return;$('reports-dialog').showModal();loadReports();});
 $('refresh-reports').addEventListener('click',loadReports);
 $('close-reports').addEventListener('click',()=>{reportsVersion++;$('reports-dialog').close();});
 $('reports-dialog').addEventListener('close',()=>{reportsVersion++;});
@@ -894,8 +998,7 @@ $('back-feed').addEventListener('click', () => switchView('home'));
 $('home').addEventListener('click', () => switchView('home'));
 $('me').addEventListener('click', () => switchView('me'));
 $('retry').addEventListener('click', load);
-$('open-settings').addEventListener('click', () => $('settings-dialog').showModal());
-$('close-settings').addEventListener('click', () => $('settings-dialog').close());
+$('open-settings').addEventListener('click', () => { switchView('settings'); $('settings-heading').focus(); });
 $('language').value = getLanguage();
 $('language').addEventListener('change', () => {
   const language = $('language').value;
@@ -903,12 +1006,14 @@ $('language').addEventListener('change', () => {
   try { setLanguage(language); location.reload(); }
   catch { $('language').value = getLanguage(); status.textContent = t('บันทึกภาษาไม่ได้ กรุณาอนุญาตให้เบราว์เซอร์เก็บการตั้งค่าแล้วลองอีกครั้ง'); }
 });
-$('theme').addEventListener('change', () => {
-  setTheme($('theme').value);
-  try { localStorage.setItem(themeKey(), $('theme').value); }
-  catch { status.textContent = t('เปลี่ยนธีมแล้ว แต่เบราว์เซอร์ไม่อนุญาตให้จำการตั้งค่า'); }
-});
-$('open-archive').addEventListener('click', () => { $('settings-dialog').close(); switchView('archive'); });
+for (const theme of ['light', 'dark']) {
+  $('theme-' + theme).addEventListener('click', () => {
+    setTheme(theme);
+    try { localStorage.setItem(themeKey(), theme); }
+    catch { status.textContent = t('เปลี่ยนธีมแล้ว แต่เบราว์เซอร์ไม่อนุญาตให้จำการตั้งค่า'); }
+  });
+}
+$('open-archive').addEventListener('click', () => {  switchView('archive'); });
 const confirmLogout=createLogoutConfirmation({
   dialog:$('logout-dialog'),confirm:$('confirm-logout'),cancel:$('cancel-logout'),status:$('logout-status'),
   t,errorText:error=>localizeError(error.message),now:()=>Date.now(),schedule:setInterval,unschedule:clearInterval,
@@ -937,7 +1042,7 @@ $('post-form').addEventListener('submit', async event => {
   if (remaining) { $('post-status').textContent = t('กรุณารออีก {seconds} วินาทีก่อนโพสต์ถัดไป', { seconds: remaining }); return; }
   const category = $('post-category').value;
   if (!Object.values(categoryButtons).filter(label => label !== 'ทั้งหมด').includes(category)) { $('post-status').textContent = t('กรุณาเลือกหมวดหมู่โพสต์'); return; }
-  if (sdk.auth.currentUser.isAnonymous && category !== 'ถาม-ตอบ') { $('post-status').textContent = t('หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login'); return; }
+  if (sdk.auth.currentUser.isAnonymous && !['ทั่วไป', 'ถาม-ตอบ'].includes(category)) { $('post-status').textContent = t('หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login'); return; }
   if(category==='ประกาศ' && !['dev','admin'].includes(profile?.role)){ $('post-status').textContent=t('เฉพาะ Admin และ Dev เท่านั้นที่โพสต์ประกาศได้');return;}
   const text = $('post-text').value.trim();
   if (!text && !selectedFiles.length) { $('post-status').textContent = t('กรุณาพิมพ์ข้อความหรือแนบรูปภาพ/วิดีโอ'); return; }
@@ -947,9 +1052,7 @@ $('post-form').addEventListener('submit', async event => {
     for (let index = uploadedFiles.length; index < selectedFiles.length; index++) {
       $('post-status').textContent = t('กำลังอัปโหลดไฟล์ {current}/{total}', { current: index + 1, total: selectedFiles.length });
       const file = selectedFiles[index];
-      const response = await fetch('/api/media', { method: 'POST', headers: { Authorization: 'Bearer ' + await sdk.auth.currentUser.getIdToken(), 'Content-Type': file.type }, body: file });
-      const result = await response.json();
-      if (!response.ok) throw new Error(localizeError(result.message) || t('อัปโหลดไม่สำเร็จ'));
+      const result = await uploadMedia(file,sdk.auth.currentUser);
       uploadedFiles.push(result.id);
     }
     $('post-status').textContent = t('กำลังบันทึกโพสต์…');
@@ -1008,9 +1111,7 @@ $('edit-form').addEventListener('submit', async event => {
     if (!profile.isGuest && !$('remove-photo').checked && selectedPhoto) {
       if (!uploadedPhotoId) {
         $('edit-status').textContent = t('กำลังอัปโหลดรูปโปรไฟล์…');
-        const response = await fetch('/api/media', { method: 'POST', headers: { Authorization: 'Bearer ' + await sdk.auth.currentUser.getIdToken(), 'Content-Type': selectedPhoto.type }, body: selectedPhoto });
-        const result = await response.json();
-        if (!response.ok) throw new Error(localizeError(result.message) || t('อัปโหลดรูปไม่สำเร็จ'));
+        const result = await uploadMedia(selectedPhoto,sdk.auth.currentUser);
         uploadedPhotoId = result.id;
       }
       photoMediaId = uploadedPhotoId;
@@ -1030,5 +1131,8 @@ try {
     if (!user) { $('app').hidden = true; if (!redirecting) location.replace('/'); }
     else load();
   });
-} catch (error) { showError(error); }
+} catch (error) { finishInitialLoading(); showError(error); }
 
+
+$('close-moderation').addEventListener('click',()=>$('moderation-cancel').click());
+$('close-logout').addEventListener('click',()=>$('cancel-logout').click());

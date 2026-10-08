@@ -1,27 +1,65 @@
 <!doctype html>
-<html lang="th">
+<html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content"><title>Mairu KMUTNB Community</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content"><title>Kmunity KMTNB Community</title>
 <script src="theme.js"></script>
+<script src="nav-motion.js" defer></script>
 <link rel="stylesheet" href="main.css">
 <link rel="icon" type="image/png" href="kmutnb-logo.png">
 </head>
 <body class="community-page">
-<header class="site-header"><h1><a class="brand" id="brand-home" href="/main.html" aria-label="Mairu KMUTNB Community กลับหน้าแรกและรีเซ็ตฟีด" data-i18n-aria-label="Mairu KMUTNB Community กลับหน้าแรกและรีเซ็ตฟีด"><img class="brand-logo" src="kmutnb-logo.png" alt="ตรามหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ" data-i18n-alt="ตรามหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ" width="52" height="52"><span>Mairu <small>KMUTNB Community</small></span></a></h1></header>
+<header class="site-header"><h1><a class="brand" id="brand-home" href="/main.html" aria-label="Kmunity KMTNB Community กลับหน้าแรกและรีเซ็ตฟีด" data-i18n-aria-label="Kmunity KMTNB Community กลับหน้าแรกและรีเซ็ตฟีด"><img class="brand-logo" src="kmutnb-logo.png" alt="ตรามหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ" data-i18n-alt="ตรามหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ" width="52" height="52"><span>Kmunity <small>KMTNB Community</small></span></a></h1></header>
 <main>
-<p id="status" role="status" aria-live="polite" data-i18n="กำลังตรวจสอบการเข้าสู่ระบบ…">กำลังตรวจสอบการเข้าสู่ระบบ…</p>
+<p id="status" class="boot-status" role="status" aria-live="polite" data-i18n="กำลังตรวจสอบการเข้าสู่ระบบ…">กำลังตรวจสอบการเข้าสู่ระบบ…</p>
+<section id="initial-loading" aria-hidden="true"><div class="loading-nav"><span class="skeleton-block skeleton-nav"></span><span class="skeleton-block skeleton-nav"></span><span class="skeleton-block skeleton-nav"></span><span class="skeleton-block skeleton-nav"></span></div><div class="loading-content"><div class="loading-toolbar"><span class="skeleton-block skeleton-announcement"></span><span class="skeleton-block skeleton-filter"></span></div><div class="skeleton-feed"><article class="loading-card" aria-hidden="true"><div class="loading-card-header"><span class="skeleton-block skeleton-avatar"></span><div class="loading-identity"><span class="skeleton-block skeleton-name"></span><span class="skeleton-block skeleton-date"></span></div><span class="skeleton-block skeleton-category"></span></div><div class="loading-text"><span class="skeleton-block skeleton-line"></span><span class="skeleton-block skeleton-line-short"></span></div><span class="skeleton-block skeleton-media"></span><div class="loading-actions"><span class="skeleton-block skeleton-action"></span><span class="skeleton-block skeleton-action"></span><span class="skeleton-block skeleton-action"></span></div></article><article class="loading-card" aria-hidden="true"><div class="loading-card-header"><span class="skeleton-block skeleton-avatar"></span><div class="loading-identity"><span class="skeleton-block skeleton-name"></span><span class="skeleton-block skeleton-date"></span></div><span class="skeleton-block skeleton-category"></span></div><div class="loading-text"><span class="skeleton-block skeleton-line"></span><span class="skeleton-block skeleton-line-short"></span></div><div class="loading-actions"><span class="skeleton-block skeleton-action"></span><span class="skeleton-block skeleton-action"></span><span class="skeleton-block skeleton-action"></span></div></article><article class="loading-card" aria-hidden="true"><div class="loading-card-header"><span class="skeleton-block skeleton-avatar"></span><div class="loading-identity"><span class="skeleton-block skeleton-name"></span><span class="skeleton-block skeleton-date"></span></div><span class="skeleton-block skeleton-category"></span></div><div class="loading-text"><span class="skeleton-block skeleton-line"></span><span class="skeleton-block skeleton-line-short"></span></div><div class="loading-actions"><span class="skeleton-block skeleton-action"></span><span class="skeleton-block skeleton-action"></span><span class="skeleton-block skeleton-action"></span></div></article></div></div></section>
 <section id="app" hidden>
 <nav id="main-nav" class="sidebar" aria-label="เมนูหลัก" data-i18n-aria-label="เมนูหลัก">
-<p class="nav-caption" data-i18n="ชุมชนของคุณ">ชุมชนของคุณ</p>
-<button id="home" type="button" aria-current="page" data-i18n="หน้าแรก">หน้าแรก</button>
-<button id="open-post" type="button" data-i18n="โพสต์">โพสต์</button>
-<button id="open-contact-admin" type="button" aria-haspopup="dialog" aria-controls="contact-admin-dialog" data-i18n="ติดต่อแอดมิน">ติดต่อแอดมิน</button>
-<button id="open-usage-report" type="button" aria-haspopup="dialog" aria-controls="usage-report-dialog" data-i18n="รายงานปัญหาการใช้งาน">รายงานปัญหาการใช้งาน</button>
-<button id="open-search" type="button" aria-haspopup="dialog" aria-controls="search-dialog" data-i18n="ค้นหา">ค้นหา</button>
-<button id="me" type="button" data-i18n="ฉัน">ฉัน</button>
-<button id="open-settings" type="button" data-i18n="ตั้งค่า">ตั้งค่า</button>
+<div class="nav-primary">
+<button id="home" type="button" aria-current="page" aria-label="หน้าแรก" data-i18n-aria-label="หน้าแรก" title="หน้าแรก" data-i18n-title="หน้าแรก"><svg class="nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m4 10 6.5-5.2a2.4 2.4 0 0 1 3 0L20 10v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M9 15h6"/></svg><span class="nav-label" aria-hidden="true" data-i18n="หน้าแรก">หน้าแรก</span></button>
+<button id="open-search" type="button" aria-controls="search-page" aria-label="ค้นหา" data-i18n-aria-label="ค้นหา" title="ค้นหา" data-i18n-title="ค้นหา"><svg class="nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg><span class="nav-label" aria-hidden="true" data-i18n="ค้นหา">ค้นหา</span></button>
+<button id="me" type="button" aria-label="ฉัน" data-i18n-aria-label="ฉัน" title="ฉัน" data-i18n-title="ฉัน"><svg class="nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="3.5"/><path d="M5 20v-1a7 7 0 0 1 14 0v1"/></svg><span class="nav-label" aria-hidden="true" data-i18n="ฉัน">ฉัน</span></button>
+<button id="open-settings" type="button" aria-controls="settings-page" aria-label="ตั้งค่า" data-i18n-aria-label="ตั้งค่า" title="ตั้งค่า" data-i18n-title="ตั้งค่า"><svg class="nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 4 .7-2h4.6l.7 2 2 .9 2-.4 2.3 4-1.4 1.6v2.2l1.4 1.6-2.3 4-2-.4-2 .9-.7 2H9.7l-.7-2-2-.9-2 .4-2.3-4L4 12.3v-2.2L2.7 8.5l2.3-4 2 .4Z"/><circle cx="12" cy="11.2" r="3"/></svg><span class="nav-label" aria-hidden="true" data-i18n="ตั้งค่า">ตั้งค่า</span></button>
+</div>
+<button id="open-post" type="button" aria-label="โพสต์" data-i18n-aria-label="โพสต์" title="โพสต์" data-i18n-title="โพสต์"><svg class="nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg><span class="nav-label" aria-hidden="true" data-i18n="โพสต์">โพสต์</span></button>
 </nav>
-<div class="community-content">
+<div id="community-content" class="community-content">
+<section id="settings-page" hidden aria-labelledby="settings-heading">
+<div class="settings-header"><h2 id="settings-heading" tabindex="-1" data-i18n="ตั้งค่า">ตั้งค่า</h2></div>
+<div class="theme-setting">
+<span id="theme-label" data-i18n="ธีม">ธีม</span>
+<div class="theme-choice" role="group" aria-labelledby="theme-label">
+<button id="theme-light" type="button" aria-label="ขาว" data-i18n-aria-label="ขาว" title="ขาว" data-i18n-title="ขาว" aria-pressed="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg></button>
+<button id="theme-dark" type="button" aria-label="ดำ" data-i18n-aria-label="ดำ" title="ดำ" data-i18n-title="ดำ" aria-pressed="false"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.8 13.2A9 9 0 0 1 10.8 3.2a9 9 0 1 0 10 10Z"/></svg></button>
+</div>
+</div>
+<p><label for="language" data-i18n="ภาษา">ภาษา</label> <select id="language"><option value="th">ไทย</option><option value="en">English</option></select></p>
+<p id="language-help" data-i18n="เปลี่ยนภาษาแล้วเว็บจะโหลดใหม่">เปลี่ยนภาษาแล้วเว็บจะโหลดใหม่</p>
+<p><button id="open-archive" type="button" data-i18n="คลังของฉัน">คลังของฉัน</button></p>
+<p data-i18n="คลังเก็บโพสต์ของคุณที่ซ่อนจากฟีด คนอื่นจะไม่เห็น">คลังเก็บโพสต์ของคุณที่ซ่อนจากฟีด คนอื่นจะไม่เห็น</p>
+<p><button id="open-saved" type="button" data-i18n="โพสต์ที่บันทึกไว้">โพสต์ที่บันทึกไว้</button></p>
+<p><button id="open-contact-admin" type="button" aria-haspopup="dialog" aria-controls="contact-admin-dialog" data-i18n="ติดต่อแอดมิน">ติดต่อแอดมิน</button></p>
+<p><button id="open-usage-report" type="button" aria-haspopup="dialog" aria-controls="usage-report-dialog" data-i18n="รายงานปัญหาการใช้งาน">รายงานปัญหาการใช้งาน</button></p>
+<section id="admin-menu" aria-labelledby="admin-menu-heading" hidden>
+<h3 id="admin-menu-heading">Admin Menu</h3>
+<div class="admin-menu-actions">
+<button id="open-reports" type="button" hidden data-i18n="กล่องรับรายงาน">กล่องรับรายงาน</button>
+<button id="open-restricted" type="button" hidden data-i18n="รายชื่อผู้ใช้ที่ถูกจำกัด">รายชื่อผู้ใช้ที่ถูกจำกัด</button>
+</div>
+</section>
+<p><button id="logout" type="button" data-i18n="ออกจากระบบ">ออกจากระบบ</button></p>
+
+</section>
+<section id="search-page" hidden aria-labelledby="search-heading">
+<div class="search-header"><h2 id="search-heading" tabindex="-1" data-i18n="ค้นหา">ค้นหา</h2></div>
+<form id="search-form">
+<label for="search-input" data-i18n="ค้นหา @username หรือ #แฮชแท็ก">ค้นหา @username หรือ #แฮชแท็ก</label>
+<div class="search-input-row"><input id="search-input" type="search" maxlength="65" autocomplete="off" placeholder="@username หรือ #แฮชแท็ก" data-i18n-placeholder="@username หรือ #แฮชแท็ก" required><button type="submit" data-i18n="ค้นหา">ค้นหา</button></div>
+</form>
+<div><p id="search-status" role="status" aria-live="polite"></p><div id="search-results"></div></div>
+<section aria-labelledby="search-history-heading"><div class="search-history-header"><h3 id="search-history-heading" data-i18n="ประวัติการค้นหา">ประวัติการค้นหา</h3><button id="clear-search-history" type="button" data-i18n="ล้างประวัติ">ล้างประวัติ</button></div><p id="search-history-empty" class="search-history-empty" data-i18n="ยังไม่มีประวัติการค้นหา">ยังไม่มีประวัติการค้นหา</p><div id="search-history-list"></div></section>
+<section aria-labelledby="trending-heading"><h3 id="trending-heading" data-i18n="ยอดนิยม">ยอดนิยม</h3><p id="trending-status" role="status" aria-live="polite"></p><ol id="trending-tags"></ol></section>
+</section>
+<div id="feed-view">
 <section id="me-profile" hidden>
 <img id="avatar" class="avatar" src="default-avatar.svg" alt="รูปโปรไฟล์" data-i18n-alt="รูปโปรไฟล์" width="96" height="96">
 <div class="profile-name-row"><h2 id="display-name"></h2><span id="my-role" class="role-badge" hidden></span></div>
@@ -50,28 +88,20 @@
 <div id="hashtag-filter" hidden><span id="selected-hashtag"></span><button id="clear-hashtag" type="button" data-i18n="ล้างแฮชแท็ก">ล้างแฮชแท็ก</button></div>
 <section id="feed" aria-label="รายการโพสต์" data-i18n-aria-label="รายการโพสต์"></section>
 </div>
+</div>
 </section>
 <button id="retry" type="button" hidden data-i18n="ลองโหลดข้อมูลอีกครั้ง">ลองโหลดข้อมูลอีกครั้ง</button>
-<dialog id="search-dialog" aria-labelledby="search-heading">
-<div class="search-header"><h2 id="search-heading" data-i18n="ค้นหา">ค้นหา</h2><button id="close-search" type="button" data-i18n="ปิด">ปิด</button></div>
-<form id="search-form">
-<label for="search-input" data-i18n="ค้นหา @username หรือ #แฮชแท็ก">ค้นหา @username หรือ #แฮชแท็ก</label>
-<div class="search-input-row"><input id="search-input" type="search" maxlength="65" autocomplete="off" placeholder="@username หรือ #แฮชแท็ก" data-i18n-placeholder="@username หรือ #แฮชแท็ก" required><button type="submit" data-i18n="ค้นหา">ค้นหา</button></div>
-</form>
-<div><p id="search-status" role="status" aria-live="polite"></p><div id="search-results"></div></div>
-<section aria-labelledby="search-history-heading"><div class="search-history-header"><h3 id="search-history-heading" data-i18n="ประวัติการค้นหา">ประวัติการค้นหา</h3><button id="clear-search-history" type="button" data-i18n="ล้างประวัติ">ล้างประวัติ</button></div><p id="search-history-empty" class="search-history-empty" data-i18n="ยังไม่มีประวัติการค้นหา">ยังไม่มีประวัติการค้นหา</p><div id="search-history-list"></div></section>
-<section aria-labelledby="trending-heading"><h3 id="trending-heading" data-i18n="ยอดนิยม">ยอดนิยม</h3><p id="trending-status" role="status" aria-live="polite"></p><ol id="trending-tags"></ol></section>
-</dialog>
+
 <dialog id="likes-dialog" aria-labelledby="likes-heading">
-<h2 id="likes-heading" data-i18n="คนที่กดใจ">คนที่กดใจ</h2><p id="likes-status" role="status" aria-live="polite"></p><div id="likes-list"></div>
-    <button id="more-likes" type="button" hidden data-i18n="ดูเพิ่ม">ดูเพิ่ม</button><button id="close-likes" type="button" data-i18n="ปิด">ปิด</button>
+<div class="dialog-header"><h2 id="likes-heading" data-i18n="คนที่กดใจ">คนที่กดใจ</h2><button id="close-likes" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div><p id="likes-status" role="status" aria-live="polite"></p><div id="likes-list"></div>
+    <button id="more-likes" type="button" hidden data-i18n="ดูเพิ่ม">ดูเพิ่ม</button>
 </dialog>
 <dialog id="comments-dialog" aria-labelledby="comments-heading">
 <div id="comments-header">
 <h2 id="comments-heading" data-i18n="คอมเมนต์">คอมเมนต์</h2>
 <div id="comments-footer">
 <button id="refresh-comments" type="button" aria-label="รีเฟรชคอมเมนต์" data-i18n-aria-label="รีเฟรชคอมเมนต์" title="รีเฟรชคอมเมนต์" data-i18n-title="รีเฟรชคอมเมนต์"><span aria-hidden="true">↻</span></button>
-<button id="close-comments" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button>
+<button id="close-comments" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button>
 </div>
 </div>
 <div id="comments-scroll" tabindex="0" aria-label="โพสต์และคอมเมนต์" data-i18n-aria-label="โพสต์และคอมเมนต์">
@@ -88,14 +118,14 @@
 
 </dialog>
 <dialog id="comment-edit-dialog" aria-labelledby="comment-edit-heading">
-<h2 id="comment-edit-heading" data-i18n="แก้ไขคอมเมนต์">แก้ไขคอมเมนต์</h2>
+<div class="dialog-header"><h2 id="comment-edit-heading" data-i18n="แก้ไขคอมเมนต์">แก้ไขคอมเมนต์</h2><button id="cancel-comment-edit" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
 <form id="comment-edit-form"><fieldset id="comment-edit-fields">
 <p><label class="sr-only" for="comment-edit-text" data-i18n="ข้อความคอมเมนต์">ข้อความคอมเมนต์</label><textarea id="comment-edit-text" rows="4" maxlength="2000" required></textarea></p>
 <p id="comment-edit-status" role="status" aria-live="polite"></p>
-<button id="save-comment-edit" type="submit" data-i18n="บันทึก">บันทึก</button><button id="cancel-comment-edit" type="button" data-i18n="ยกเลิก">ยกเลิก</button>
+<button id="save-comment-edit" type="submit" data-i18n="บันทึก">บันทึก</button>
 </fieldset></form></dialog>
 <dialog id="filter-dialog" aria-labelledby="filter-heading">
-<h2 id="filter-heading" data-i18n="Filter · เลือกหมวดหมู่">Filter · เลือกหมวดหมู่</h2>
+<div class="dialog-header"><h2 id="filter-heading" data-i18n="Filter · เลือกหมวดหมู่">Filter · เลือกหมวดหมู่</h2><button id="close-filter" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
 <nav id="category-filters" aria-label="เลือกหมวดหมู่โพสต์" data-i18n-aria-label="เลือกหมวดหมู่โพสต์">
 <button id="category-all" type="button" aria-pressed="true" data-i18n="ทั้งหมด">ทั้งหมด</button>
 <button id="category-general" type="button" aria-pressed="false" data-i18n="ทั่วไป">ทั่วไป</button>
@@ -104,10 +134,10 @@
 <button id="category-lost" type="button" aria-pressed="false" data-i18n="ของหาย">ของหาย</button>
 <button id="category-announcement" type="button" aria-pressed="false" data-i18n="ประกาศ">ประกาศ</button>
 </nav>
-<button id="close-filter" type="button" data-i18n="ปิด">ปิด</button>
+
 </dialog>
 <dialog id="post-dialog" aria-labelledby="post-heading">
-<h2 id="post-heading" data-i18n="เขียนโพสต์">เขียนโพสต์</h2>
+<div class="dialog-header"><h2 id="post-heading" data-i18n="เขียนโพสต์">เขียนโพสต์</h2><button id="cancel-post" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
 <form id="post-form">
 <p><label for="post-category" data-i18n="หมวดหมู่โพสต์">หมวดหมู่โพสต์</label><br>
 <select id="post-category" required aria-describedby="guest-category-note">
@@ -127,64 +157,47 @@
 <div id="media-preview" aria-label="ตัวอย่างไฟล์แนบ" data-i18n-aria-label="ตัวอย่างไฟล์แนบ"></div>
 <p data-i18n="ทุกคนที่เข้าสู่ระบบจะเห็นโพสต์นี้">ทุกคนที่เข้าสู่ระบบจะเห็นโพสต์นี้</p>
 <p id="post-status" role="status" aria-live="polite"></p>
-<button id="submit-post" type="submit" data-i18n="โพสต์">โพสต์</button><button id="cancel-post" type="button" data-i18n="ยกเลิก">ยกเลิก</button>
+<button id="submit-post" type="submit" data-i18n="โพสต์">โพสต์</button>
 </form>
 </dialog>
-<dialog id="settings-dialog" aria-labelledby="settings-heading">
-<h2 id="settings-heading" data-i18n="ตั้งค่า">ตั้งค่า</h2>
-<p><label for="theme" data-i18n="ธีม">ธีม</label> <select id="theme"><option value="light" data-i18n="ขาว">ขาว</option><option value="dark" data-i18n="ดำ">ดำ</option></select></p>
-<p><label for="language" data-i18n="ภาษา">ภาษา</label> <select id="language"><option value="th">ไทย</option><option value="en">English</option></select></p>
-<p id="language-help" data-i18n="เปลี่ยนภาษาแล้วเว็บจะโหลดใหม่">เปลี่ยนภาษาแล้วเว็บจะโหลดใหม่</p>
-<p><button id="open-archive" type="button" data-i18n="คลังของฉัน">คลังของฉัน</button></p>
-<p data-i18n="คลังเก็บโพสต์ของคุณที่ซ่อนจากฟีด คนอื่นจะไม่เห็น">คลังเก็บโพสต์ของคุณที่ซ่อนจากฟีด คนอื่นจะไม่เห็น</p>
-<p><button id="open-saved" type="button" data-i18n="โพสต์ที่บันทึกไว้">โพสต์ที่บันทึกไว้</button></p>
-<section id="admin-menu" aria-labelledby="admin-menu-heading" hidden>
-<h3 id="admin-menu-heading">Admin Menu</h3>
-<div class="admin-menu-actions">
-<button id="open-reports" type="button" hidden data-i18n="กล่องรับรายงาน">กล่องรับรายงาน</button>
-<button id="open-restricted" type="button" hidden data-i18n="รายชื่อผู้ใช้ที่ถูกจำกัด">รายชื่อผู้ใช้ที่ถูกจำกัด</button>
-</div>
-</section>
-<p><button id="logout" type="button" data-i18n="ออกจากระบบ">ออกจากระบบ</button></p>
-<button id="close-settings" type="button" data-i18n="ปิด">ปิด</button>
-</dialog>
+
 <dialog id="delete-post-dialog" aria-labelledby="delete-post-heading">
-<h2 id="delete-post-heading" data-i18n="ลบโพสต์นี้?">ลบโพสต์นี้?</h2>
+<div class="dialog-header"><h2 id="delete-post-heading" data-i18n="ลบโพสต์นี้?">ลบโพสต์นี้?</h2><button id="cancel-delete-post" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
 <p data-i18n="โพสต์จะถูกลบถาวร และไม่อยู่ในคลัง">โพสต์จะถูกลบถาวร และไม่อยู่ในคลัง</p>
 <p id="delete-post-status" role="status" aria-live="polite"></p>
-<button id="confirm-delete-post" type="button" data-i18n="ลบโพสต์">ลบโพสต์</button><button id="cancel-delete-post" type="button" data-i18n="ยกเลิก">ยกเลิก</button>
+<button id="confirm-delete-post" type="button" data-i18n="ลบโพสต์">ลบโพสต์</button>
 </dialog>
 <dialog id="contact-admin-dialog" aria-labelledby="contact-admin-heading">
-<h2 id="contact-admin-heading" data-i18n="ติดต่อแอดมิน">ติดต่อแอดมิน</h2>
+<div class="dialog-header"><h2 id="contact-admin-heading" data-i18n="ติดต่อแอดมิน">ติดต่อแอดมิน</h2><button id="cancel-contact-admin" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
 <p data-i18n="ส่งถึง Dev และ Admin">ส่งถึง Dev และ Admin</p>
 <form id="contact-admin-form"><fieldset id="contact-admin-fields">
 <p><label for="contact-admin-details" data-i18n="ข้อความ">ข้อความ</label><textarea id="contact-admin-details" rows="5" maxlength="2000" required placeholder="เขียนเรื่องที่ต้องการติดต่อ" data-i18n-placeholder="เขียนเรื่องที่ต้องการติดต่อ"></textarea></p>
 <p id="contact-admin-status" role="status" aria-live="polite"></p>
-<button type="submit" data-i18n="ส่งข้อความ">ส่งข้อความ</button><button id="cancel-contact-admin" type="button" data-i18n="ยกเลิก">ยกเลิก</button>
+<button type="submit" data-i18n="ส่งข้อความ">ส่งข้อความ</button>
 </fieldset></form>
 </dialog>
 <dialog id="usage-report-dialog" aria-labelledby="usage-report-heading">
-<h2 id="usage-report-heading" data-i18n="รายงานปัญหาการใช้งาน">รายงานปัญหาการใช้งาน</h2>
+<div class="dialog-header"><h2 id="usage-report-heading" data-i18n="รายงานปัญหาการใช้งาน">รายงานปัญหาการใช้งาน</h2><button id="cancel-usage-report" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
 <p data-i18n="ส่งถึง Dev">ส่งถึง Dev</p>
 <form id="usage-report-form"><fieldset id="usage-report-fields">
 <p><label for="usage-report-details" data-i18n="อธิบายปัญหาที่พบ">อธิบายปัญหาที่พบ</label><textarea id="usage-report-details" rows="5" maxlength="2000" required placeholder="บอกสิ่งที่เกิดขึ้นและขั้นตอนที่ทำให้พบปัญหา" data-i18n-placeholder="บอกสิ่งที่เกิดขึ้นและขั้นตอนที่ทำให้พบปัญหา"></textarea></p>
 <p id="usage-report-status" role="status" aria-live="polite"></p>
-<button type="submit" data-i18n="ส่งรายงาน">ส่งรายงาน</button><button id="cancel-usage-report" type="button" data-i18n="ยกเลิก">ยกเลิก</button>
+<button type="submit" data-i18n="ส่งรายงาน">ส่งรายงาน</button>
 </fieldset></form>
 </dialog>
 <dialog id="report-dialog" aria-labelledby="report-heading">
-<h2 id="report-heading" data-i18n="รายงานโพสต์">รายงานโพสต์</h2>
+<div class="dialog-header"><h2 id="report-heading" data-i18n="รายงานโพสต์">รายงานโพสต์</h2><button id="cancel-report" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
 <p data-i18n="ส่งถึง Dev และ Admin">ส่งถึง Dev และ Admin</p>
 <form id="report-form"><fieldset id="report-fields">
 <p><label for="report-reason" data-i18n="หัวข้อรายงาน">หัวข้อรายงาน</label><select id="report-reason" required>
 <option value="" data-i18n="เลือกหัวข้อ">เลือกหัวข้อ</option><option value="inappropriate" data-i18n="ไม่เหมาะสม">ไม่เหมาะสม</option><option value="spam" data-i18n="สแปม">สแปม</option></select></p>
 <p><label class="sr-only" for="report-details" data-i18n="อธิบายเพิ่มเติม">อธิบายเพิ่มเติม</label><textarea id="report-details" rows="4" maxlength="2000" placeholder="อธิบายเพิ่มเติม" data-i18n-placeholder="อธิบายเพิ่มเติม"></textarea></p>
 <p id="report-status" role="status" aria-live="polite"></p>
-<button type="submit" data-i18n="ส่งรายงาน">ส่งรายงาน</button><button id="cancel-report" type="button" data-i18n="ยกเลิก">ยกเลิก</button>
+<button type="submit" data-i18n="ส่งรายงาน">ส่งรายงาน</button>
 </fieldset></form>
 </dialog>
 <dialog id="reports-dialog" aria-labelledby="reports-heading">
-<div class="search-header"><h2 id="reports-heading" data-i18n="กล่องรับรายงาน">กล่องรับรายงาน</h2><button id="close-reports" type="button" data-i18n="ปิด">ปิด</button></div>
+<div class="dialog-header"><h2 id="reports-heading" data-i18n="กล่องรับรายงาน">กล่องรับรายงาน</h2><button id="close-reports" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
 <div class="report-categories" role="group" aria-label="หมวดหมู่รายงาน" data-i18n-aria-label="หมวดหมู่รายงาน">
 <button id="reports-category-post" type="button" aria-pressed="true" data-i18n="โพสต์">โพสต์</button>
 <button id="reports-category-comment" type="button" aria-pressed="false" data-i18n="คอมเมนต์">คอมเมนต์</button>
@@ -196,18 +209,18 @@
 <button id="refresh-reports" type="button" data-i18n="โหลดรายงานใหม่">โหลดรายงานใหม่</button>
 </dialog>
 <dialog id="restricted-dialog" aria-labelledby="restricted-heading">
-<div class="search-header"><h2 id="restricted-heading" data-i18n="รายชื่อผู้ใช้ที่ถูกจำกัด">รายชื่อผู้ใช้ที่ถูกจำกัด</h2><button id="close-restricted" type="button" data-i18n="ปิด">ปิด</button></div>
+<div class="dialog-header"><h2 id="restricted-heading" data-i18n="รายชื่อผู้ใช้ที่ถูกจำกัด">รายชื่อผู้ใช้ที่ถูกจำกัด</h2><button id="close-restricted" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
 <p id="restricted-status" role="status" aria-live="polite"></p><div id="restricted-list"></div>
 <button id="refresh-restricted" type="button" data-i18n="โหลดรายชื่อใหม่">โหลดรายชื่อใหม่</button>
 </dialog>
 <dialog id="moderation-dialog" aria-labelledby="moderation-heading">
-<h2 id="moderation-heading"></h2><p id="moderation-description"></p>
+<div class="dialog-header"><h2 id="moderation-heading"></h2><button id="close-moderation" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div><p id="moderation-description"></p>
 <div id="moderation-reason-field" hidden><label for="moderation-reason" data-i18n="เหตุผลที่แบน">เหตุผลที่แบน</label><textarea id="moderation-reason" rows="3" maxlength="2000" placeholder="อธิบายเหตุผลที่แบน" data-i18n-placeholder="อธิบายเหตุผลที่แบน"></textarea></div>
 <p id="moderation-status" role="status" aria-live="polite"></p>
 <div class="confirmation-actions"><button id="moderation-confirm" type="button" disabled data-i18n="แน่ใจ">แน่ใจ</button><button id="moderation-cancel" type="button" data-i18n="ไม่">ไม่</button></div>
 </dialog>
 <dialog id="edit-dialog" aria-labelledby="edit-heading">
-<h2 id="edit-heading" data-i18n="แก้ไขโปรไฟล์">แก้ไขโปรไฟล์</h2>
+<div class="dialog-header"><h2 id="edit-heading" data-i18n="แก้ไขโปรไฟล์">แก้ไขโปรไฟล์</h2><button id="cancel-edit" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
 <form id="edit-form">
 <fieldset id="edit-fields">
 <p><label for="edit-name" data-i18n="ชื่อเล่น">ชื่อเล่น</label><br><input id="edit-name" maxlength="50" required></p>
@@ -231,12 +244,12 @@
 <p><label for="edit-bio" data-i18n="แนะนำตัว">แนะนำตัว</label><br><textarea id="edit-bio" rows="4" maxlength="300"></textarea></p>
 
 <p id="edit-status" role="status" aria-live="polite"></p>
-<button type="submit" data-i18n="บันทึก">บันทึก</button><button id="cancel-edit" type="button" data-i18n="ยกเลิก">ยกเลิก</button>
+<button type="submit" data-i18n="บันทึก">บันทึก</button>
 </fieldset>
 </form>
 </dialog>
 <dialog id="logout-dialog" aria-labelledby="logout-heading">
-<h2 id="logout-heading" data-i18n="ออกจากระบบ?">ออกจากระบบ?</h2>
+<div class="dialog-header"><h2 id="logout-heading" data-i18n="ออกจากระบบ?">ออกจากระบบ?</h2><button id="close-logout" class="dialog-close" type="button" aria-label="ปิด" data-i18n-aria-label="ปิด" title="ปิด" data-i18n-title="ปิด"><span aria-hidden="true">×</span></button></div>
 <p id="logout-status" role="status" aria-live="polite"></p>
 <div class="confirmation-actions"><button id="confirm-logout" type="button" disabled data-i18n="แน่ใจ">แน่ใจ</button><button id="cancel-logout" type="button" data-i18n="ไม่">ไม่</button></div>
 </dialog>
