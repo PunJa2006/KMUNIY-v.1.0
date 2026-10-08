@@ -17,6 +17,6 @@
   "devDependencies": {
     "vercel": "^62.7.0"
   },
-  "version": "1.0.0",
-  "description": "KMUNIY v.1.0"
+  "version": "1.0.1",
+  "description": "KMUNIY v.1.0.1"
 }
