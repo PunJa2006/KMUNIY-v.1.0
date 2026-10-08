@@ -6,26 +6,32 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
-async function fixture({ guest = false, completed = true, posts = [], respond = null, cooldown = 0, language = 'th', languageStorageFails = false, admin = false, role = null } = {}) {
-  const fields = new Map(), storage = new Map(), calls = [];
+async function fixture({ guest = false, completed = true, posts = [], respond = null, cooldown = 0, language = 'th', languageStorageFails = false, admin = false, role = null, mediaRespond = null, systemDark = false, themeSettings = {} } = {}) {
+  const fields = new Map(), storage = new Map(Object.entries(themeSettings)), calls = [];
   const element = id => {
     if (!fields.has(id)) fields.set(id, { hidden: false, value: '', maxLength:5000, selectionStart:0, selectionEnd:0, setRangeText(text,start,end){this.value=this.value.slice(0,start)+text+this.value.slice(end);this.selectionStart=this.selectionEnd=start+text.length;}, dataset: {}, children: [], handlers: {}, getAttribute(name) { return this[name]; }, setAttribute(name, value) { this[name] = value; }, addEventListener(name, fn) { this.handlers[name] = fn; }, append(...items) { this.children.push(...items); }, replaceChildren(...items) { this.children = items; }, showModal() { this.open = true; }, close() { this.open = false; }, focus() { this.focusCalls = (this.focusCalls || 0) + 1; } });
     return fields.get(id);
   };
-  const user = { uid: 'owner', isAnonymous: guest };
+  const user = { uid: 'owner', isAnonymous: guest, getIdToken: async () => 'test-token' };
+  let nextMediaUrl = 0;
   let callback; const timers=new Map(); let nextTimer=1;
   let clock = Date.now();
   class MockDate extends Date { static now() { return clock; } }
   const context = {
+    matchMedia: query => ({matches: query === '(prefers-color-scheme: dark)' && systemDark}),
     createLogoutConfirmation, createSearchHistory, hashtagParts, t: (source, values) => t(source, values, language), localizeError: message => localizeError(message, language), dateLocale: () => dateLocale(language), getLanguage: () => language, setLanguage: value => { if(languageStorageFails) throw new Error('storage blocked'); storage.set('community-language', value); language = value; },
+    fetch: (...args) => mediaRespond?.(...args),
+    URL: { createObjectURL: () => 'blob:test/' + (++nextMediaUrl), revokeObjectURL: url => calls.push({action: 'revoke-url', url}) },
+    window: { scrollY: 0, scrollTo({top}) { this.scrollY = top; } },
     Date: MockDate, setInterval: (fn,period) => { const id=nextTimer++; timers.set(id,{fn,period,next:clock+period});return id; }, clearInterval: id => timers.delete(id),
     setTimeout: (fn,period) => {const id=nextTimer++;timers.set(id,{fn,period,next:clock+period,once:true});return id;}, clearTimeout:id=>timers.delete(id),
-    document: { addEventListener() {}, getElementById: element, documentElement: { dataset: {} }, createElement: name => element('dynamic-' + Math.random()) },
+    document: { visibilityState:'visible', handlers:{}, addEventListener(name,fn) {this.handlers[name]=fn;}, getElementById: element, documentElement: { dataset: {} }, createElement: name => element('dynamic-' + Math.random()) },
     status: {}, showError: error => { throw error; }, location: { replace: url => calls.push(url), reload: () => calls.push('reload') },
     localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
     connect: async () => ({ auth: { currentUser: user }, onAuthStateChanged: (_, fn) => { callback = fn; }, signOut: async () => {calls.push({action:'signOut'});} }),
     api: async (action, data) => { calls.push({ action, data }); if (respond && !['profile-read','profile'].includes(action)) return respond(action,data); return ['profile-read', 'profile'].includes(action) ? { role, canManageRoles:role==='dev', canModerate:admin || ['dev','admin'].includes(role), canReceiveReports:admin || ['dev','admin'].includes(role), canGrantMerchant:['dev','admin'].includes(role), postCooldownExempt:['dev','admin','merchant'].includes(role), profileCompleted: completed, displayName: 'Owner', username: guest ? null : 'owner', handle: guest ? null : 'public1', isGuest: guest, email: null, postAvailableAt: cooldown } : { posts }; }
   };
+  runInNewContext(await readFile(new URL('../public/theme.js', import.meta.url), 'utf8'), context);
   const source = (await readFile(new URL('../public/main.js', import.meta.url), 'utf8')).replace(/^\uFEFF?import .*;\r?\n/gm, '');
   await runInNewContext(`(async () => { ${source} })()`, context);
   callback(user);
@@ -55,7 +61,7 @@ test('settings contains theme and archive; Me loads personal posts and profile',
   assert.equal(f.element('feed-heading').hidden, false);
   assert.equal(f.element('display-name').textContent, 'Owner');
   await f.click('home');
-  assert.equal(f.calls.at(-1).action, 'posts-list');
+  assert.equal(f.calls.filter(call => call.action === 'posts-list').length, 1);
   assert.equal(f.element('me-profile').hidden, true);
 });
 test('posting opens a dialog and closing keeps draft text', async () => {
@@ -79,7 +85,8 @@ test('home category buttons request matching feeds and remember selection after 
   assert.equal(f.element('filter-controls').hidden, true);
   await f.click('home');
   assert.equal(f.element('filter-controls').hidden, false);
-  assert.equal(f.calls.at(-1).data.category, 'ขายของ');
+  assert.equal(f.calls.filter(call => call.action === 'posts-list').length, 2);
+  assert.equal(f.element('category-market')['aria-pressed'], 'true');
   await f.click('category-all');
   assert.equal(f.calls.at(-1).data.category, 'ทั้งหมด');
 });
@@ -165,7 +172,7 @@ test('clicking author photo opens public profile and their posts; home returns t
  assert.equal(f.element('author-profile').hidden,false);
  assert.equal(f.element('author-name').textContent,'Other'); assert.equal(f.element('author-handle').textContent,'@other1');
  assert.equal(f.element('author-bio').textContent,'About'); assert.equal(f.element('me-profile').hidden,true);
- await f.click('back-feed'); assert.equal(f.element('author-profile').hidden,true); assert.equal(f.calls.at(-1).action,'posts-list');
+ await f.click('back-feed'); assert.equal(f.element('author-profile').hidden,true); assert.equal(f.calls.filter(call=>call.action==='posts-list').length,1);
 });
 
 test('posting starts 60-second button countdown; draft is retained when retried early',async()=>{
@@ -310,7 +317,7 @@ test('staff deletion waits 3 seconds and cancel never deletes a post',async()=>{
   await findMenuOption(f,'ลบโพสต์').handlers.click();assert.equal(f.element('moderation-dialog').open,true);assert.equal(f.element('moderation-confirm').disabled,true);
   await f.click('moderation-confirm');assert.equal(f.calls.some(item=>item.action==='post-delete'),false);
   f.advanceTime(2999);assert.equal(f.element('moderation-confirm').disabled,true);
-  f.advanceTime(101);assert.equal(f.element('moderation-confirm').disabled,false);
+  f.advanceTime(101);assert.equal(f.element('moderation-confirm').disabled,false);f.element('moderation-reason').value='Spam';
   await f.click('moderation-confirm');assert.equal(f.calls.find(item=>item.action==='post-delete').data.confirmation,'test-confirmation');
   assert.equal(f.element('moderation-dialog').open,false);
  }
@@ -369,12 +376,12 @@ test('comment hearts toggle the server state and reply submission binds the sele
  actions=f.element('comments-list').children[0].children.at(-1);actions.children[1].handlers.click();assert.equal(f.element('reply-banner').hidden,false);f.element('comment-text').value='reply text';await f.element('comment-form').handlers.submit({preventDefault(){}});assert.equal(f.calls.find(c=>c.action==='comment-create').data.replyTo,'c1');assert.equal(f.element('reply-banner').hidden,true);
 });
 
-test('only ban confirmation shows and submits its reason, other confirmations clear it',async()=>{
+test('ban and staff deletion confirmations show their own reason labels and clear previous input',async()=>{
  const post={id:'p1',own:false,canDelete:true,displayName:'Other',text:'post',media:[]};
  const f=await fixture({role:'dev',respond:async action=>action==='moderation-confirm'?{confirmation:'token'}:action==='author-profile'?{profile:{displayName:'Other',handle:'other1',management:{targetUid:'other',canBan:true}},posts:[post]}:action==='user-ban'?{updated:true}:{posts:[post]}});
  f.element('feed').children[0].children[0].handlers.click();await new Promise(resolve=>setImmediate(resolve));
  const ban=f.element('author-tools').children[0].children[1].children[0];await ban.handlers.click();assert.equal(f.element('moderation-reason-field').hidden,false);f.element('moderation-reason').value='  repeated spam  ';f.advanceTime(3100);await f.click('moderation-confirm');assert.equal(f.calls.find(c=>c.action==='user-ban').data.reason,'repeated spam');
- await findMenuOption(f,'ลบโพสต์').handlers.click();assert.equal(f.element('moderation-reason-field').hidden,true);assert.equal(f.element('moderation-reason').value,'');await f.click('moderation-cancel');
+ await findMenuOption(f,'ลบโพสต์').handlers.click();assert.equal(f.element('moderation-reason-field').hidden,false);assert.equal(f.element('moderation-reason-label').textContent,'เหตุผลที่ลบโพสต์');assert.equal(f.element('moderation-reason').value,'');f.advanceTime(3100);await f.click('moderation-confirm');assert.equal(f.calls.some(c=>c.action==='post-delete'),false);f.element('moderation-reason').value='  spam post  ';await f.click('moderation-confirm');assert.equal(f.calls.find(c=>c.action==='post-delete').data.reason,'spam post');
 });
 
 
@@ -606,7 +613,7 @@ test('announcement ticker renders API announcements independently of category fi
  await track.children[0].children[0].children[0].handlers.click();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.element('comments-dialog').open,true);assert.equal(f.calls.at(-1).data.id,'a1');
 });
 test('an empty announcement list clears previous ticker content and restores the welcome message',async()=>{
- let announcements=[{id:'a1',text:'old'}];const f=await fixture({respond:async()=>({posts:[],announcements})});assert.equal(f.element('announcement-track').children.length,2);announcements=[];await f.click('home');assert.equal(f.element('announcement-track').children.length,2);assert.equal(f.element('announcement-track').children[0].children[0].children[0].textContent,'System : Welcome to my website kub ^_^');
+ let announcements=[{id:'a1',text:'old'}];const f=await fixture({respond:async()=>({posts:[],announcements})});assert.equal(f.element('announcement-track').children.length,2);announcements=[];await f.element('brand-home').handlers.click({preventDefault(){}});await new Promise(resolve=>setImmediate(resolve));assert.equal(f.element('announcement-track').children.length,2);assert.equal(f.element('announcement-track').children[0].children[0].children[0].textContent,'System : Welcome to my website kub ^_^');
 });
 
 test('selected post attachment remains in native picker until cleared or successfully posted',async()=>{
@@ -683,4 +690,191 @@ test('a stale feed response cannot clear a newer view loading state', async () =
   assert.equal(f.element('feed')['aria-busy'], 'false');
   assert.equal(f.element('feed').children.length, 0);
   assert.equal(f.element('feed-status').textContent, 'คุณยังไม่มีโพสต์');
+});
+
+test('Home restores the same posts and scroll position after Search, Settings, Me and archive without refetching', async () => {
+  const post = {id: 'original', displayName: 'Member', text: 'Original feed post', media: []};
+  const f = await fixture({respond: async action => action === 'posts-list' ? {posts: [post]} : {posts: [], tags: []}});
+  const card = f.element('feed').children[0];
+  for (const menu of ['open-search', 'open-settings', 'me', 'open-archive']) {
+    f.context.window.scrollY = 740;
+    await f.click(menu);
+    assert.equal(f.context.window.scrollY, 0);
+    f.context.window.scrollY = 80;
+    await f.click('home');
+    assert.equal(f.context.window.scrollY, 740);
+    assert.equal(f.element('feed').children[0], card);
+    assert.equal(f.element('feed')['aria-busy'], 'false');
+  }
+  assert.equal(f.calls.filter(call => call.action === 'posts-list').length, 1);
+  await f.click('home');
+  assert.equal(f.context.window.scrollY, 740);
+});
+
+test('website title resets filters, fetches fresh posts and immediately scrolls to the top from any menu', async () => {
+  const f = await fixture({posts: [{id: 'old', displayName: 'Member', text: 'Original', media: []}]});
+  await f.click('category-market');
+  f.context.window.scrollY = 900;
+  await f.click('open-settings');
+  await f.element('brand-home').handlers.click({preventDefault(){}});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.context.window.scrollY, 0);
+  assert.equal(f.calls.at(-1).action, 'posts-list');
+  assert.equal(f.calls.at(-1).data.category, 'ทั้งหมด');
+  f.context.window.scrollY = 600;
+  await f.element('brand-home').handlers.click({preventDefault(){}});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.context.window.scrollY, 0);
+  assert.equal(f.calls.filter(call => call.action === 'posts-list').length, 4);
+});
+
+test('choosing a hashtag from Search replaces the cached category feed', async () => {
+  const f = await fixture({respond: async (action, data) => action === 'posts-list' ? {posts: [{id: data.hashtag || 'original', displayName: 'Member', text: data.hashtag || 'Original', media: []}]} : {tags: [{tag: 'new', count: 2}], users: []}});
+  f.context.window.scrollY = 700;
+  await f.click('open-search');
+  f.element('search-input').value = '#new';
+  await f.element('search-form').handlers.submit({preventDefault(){}});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.calls.at(-1).data.hashtag, 'new');
+  assert.equal(f.context.window.scrollY, 0);
+  assert.equal(f.calls.filter(call => call.action === 'posts-list').length, 2);
+});
+
+test('a delayed Me response cannot replace the restored Home feed', async () => {
+  let finishMe;
+  const pending = new Promise(resolve => { finishMe = resolve; });
+  const f = await fixture({respond: action => action === 'my-posts' ? pending : {posts: [{id: 'original', displayName: 'Member', text: 'Original', media: []}]}});
+  const card = f.element('feed').children[0];
+  f.context.window.scrollY = 500;
+  await f.click('me');
+  await f.click('home');
+  finishMe({posts: []});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.element('feed').children[0], card);
+  assert.equal(f.element('feed')['aria-busy'], 'false');
+  assert.equal(f.context.window.scrollY, 500);
+});
+
+test('a pending image finishes in the cached Home card and its URL stays usable on return', async () => {
+  let finishImage;
+  const imageResponse = new Promise(resolve => { finishImage = resolve; });
+  const post = {id: 'image-post', displayName: 'Member', text: 'Image', media: [{id: 'image1', type: 'image/png'}]};
+  const f = await fixture({mediaRespond: () => imageResponse, respond: action => Promise.resolve({posts: action === 'posts-list' ? [post] : []})});
+  const card = f.element('feed').children[0];
+  const attachment = card.children.find(child => child.className === 'post-attachment');
+  await f.click('me');
+  finishImage({ok: true, blob: async () => ({})});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(attachment['aria-busy'], 'false');
+  const image = attachment.children[0];
+  assert.equal(image.src, 'blob:test/1');
+  await f.click('home');
+  assert.equal(f.element('feed').children[0], card);
+  assert.equal(attachment.children[0], image);
+  assert.equal(f.calls.some(call => call.action === 'revoke-url'), false);
+  await f.element('brand-home').handlers.click({preventDefault(){}});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.calls.filter(call => call.action === 'revoke-url' && call.url === image.src).length, 1);
+});
+
+test('deferred scroll restoration cannot scroll a newer menu to the old Home position', async () => {
+  const f = await fixture();
+  const frames = [];
+  f.context.window.requestAnimationFrame = callback => frames.push(callback);
+  f.context.window.scrollY = 800;
+  await f.click('me');
+  await f.click('home');
+  assert.equal(f.context.window.scrollY, 800);
+  await f.click('open-search');
+  while (frames.length) frames.shift()();
+  assert.equal(f.context.window.scrollY, 0);
+  assert.equal(f.element('search-page').hidden, false);
+});
+
+test('photos and names of likes and comments open the actual member or Guest profile on own and other posts', async () => {
+  for (const own of [false, true]) for (const kind of ['likes', 'comments']) for (const clickName of [false, true]) {
+    const person = {profileUid: 'guest-or-member', displayName: 'Visitor', handle: null};
+    const post = {id: 'p1', own, displayName: 'Author', text: 'Public post', media: [], commentCount: 1, likeCount: 1};
+    const f = await fixture({respond: async action => action === 'post-detail' ? {post, likes: [person], comments: [{...person, id: 'c1', text: 'Reply', parentId: 'parent'}]} : action === 'author-profile' ? {profile: {displayName: 'Visitor'}, posts: []} : {posts: [post]}});
+    const actions = f.element('feed').children[0].children.at(-1);
+    actions.children[kind === 'likes' ? 1 : 2].handlers.click();
+    await new Promise(resolve => setImmediate(resolve));
+    const card = kind === 'likes' ? f.element('likes-list').children[0] : f.element('comments-list').children[0].children[0].children[0];
+    await card.children[clickName ? 1 : 0].handlers.click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.calls.at(-1).action, 'author-profile');
+    assert.equal(f.calls.at(-1).data.profileUid, 'guest-or-member');
+    assert.equal(f.element(kind + '-dialog').open, false);
+    assert.equal(f.element('author-name').textContent, 'Visitor');
+    await f.click('back-feed');
+    assert.equal(f.calls.filter(call => call.action === 'posts-list').length, 1);
+  }
+});
+
+test('first-time member and Guest keep the detected system theme after login without storing it as a manual choice', async () => {
+  for (const guest of [false, true]) for (const systemDark of [false, true]) {
+    const f = await fixture({guest, systemDark});
+    const expected = systemDark ? 'dark' : 'light';
+    assert.equal(f.context.document.documentElement.dataset.theme, expected);
+    assert.equal(f.element('theme-' + expected)['aria-pressed'], 'true');
+    assert.equal(f.storage.has('community-last-theme'), false);
+    assert.equal(f.storage.has('community-theme:owner'), false);
+    await f.click('theme-' + (systemDark ? 'light' : 'dark'));
+    assert.equal(f.storage.get('community-last-theme'), systemDark ? 'light' : 'dark');
+    assert.equal(f.storage.get('community-theme:owner'), systemDark ? 'light' : 'dark');
+  }
+});
+
+test('saved account theme takes priority over the browser preference and invalid saved values preserve the detected theme', async () => {
+  for (const theme of ['light', 'dark']) {
+    const f = await fixture({systemDark: theme === 'light', themeSettings: {'community-last-theme': theme === 'light' ? 'dark' : 'light', 'community-theme:owner': theme}});
+    assert.equal(f.context.document.documentElement.dataset.theme, theme);
+  }
+  const f = await fixture({systemDark: true, themeSettings: {'community-theme:owner': 'invalid', 'community-last-theme': 'invalid'}});
+  assert.equal(f.context.document.documentElement.dataset.theme, 'dark');
+});
+
+test('entry and brand reset show owner notices once with safe text and X dismissal, menu navigation does not poll',async()=>{
+ const queue=[{post:{id:'p1',text:'<img src=x onerror=bad()>'},reason:'<script>not HTML</script>'}];
+ const respond=async action=>action==='post-notice-next'?{notice:queue.shift() || null}:{posts:[]};
+ const f=await fixture({respond});
+ assert.equal(f.element('post-notice-dialog').open,true);
+ assert.equal(f.element('post-notice-preview').textContent,'<img src=x onerror=bad()>');
+ assert.equal(f.element('post-notice-reason').textContent,'<script>not HTML</script>');
+ await f.click('close-post-notice');assert.equal(f.element('post-notice-dialog').open,false);
+ const count=f.calls.filter(c=>c.action==='post-notice-next').length;
+ await f.click('open-settings');await f.click('home');assert.equal(f.calls.filter(c=>c.action==='post-notice-next').length,count);
+ await f.element('brand-home').handlers.click({preventDefault(){}});await new Promise(r=>setImmediate(r));
+ assert.equal(f.element('post-notice-dialog').open,false);assert.equal(f.context.window.scrollY,0);
+ queue.push({post:{id:'p2',hasMedia:true,text:''},reason:'spam'});
+ await f.element('brand-home').handlers.click({preventDefault(){}});await new Promise(r=>setImmediate(r));
+ assert.equal(f.element('post-notice-dialog').open,true);assert.equal(f.element('post-notice-preview').textContent,'โพสต์พร้อมไฟล์แนบ');
+ await f.click('close-post-notice');
+ const returning=await fixture({respond});assert.notEqual(returning.element('post-notice-dialog').open,true);
+});
+test('multiple removal notices are claimed one at a time and repeated reset cannot replace an open notice',async()=>{
+ const queue=['first','second'];let claims=0;
+ const f=await fixture({guest:true,respond:async action=>{if(action==='post-notice-next'){claims++;const reason=queue.shift();return {notice:reason?{post:{text:reason},reason}:null};}return {posts:[]};}});
+ assert.equal(claims,1);assert.equal(f.element('post-notice-reason').textContent,'first');
+ await f.element('brand-home').handlers.click({preventDefault(){}});await new Promise(r=>setImmediate(r));assert.equal(claims,1);
+ await f.click('close-post-notice');assert.equal(claims,2);assert.equal(f.element('post-notice-reason').textContent,'second');
+ await f.element('post-notice-dialog').handlers.cancel({preventDefault(){}});await new Promise(r=>setImmediate(r));
+ assert.equal(f.element('post-notice-dialog').open,false);assert.equal(claims,3);
+});
+test('failed notice requests leave the feed usable and retry on brand reset',async()=>{
+ let fail=true;
+ const f=await fixture({respond:async action=>{if(action==='post-notice-next'){if(fail)throw new Error('Offline');return {notice:{post:{text:'post'},reason:'spam'}};}return {posts:[]};}});
+ assert.equal(f.element('feed')['aria-busy'],'false');assert.notEqual(f.element('post-notice-dialog').open,true);
+ fail=false;await f.element('brand-home').handlers.click({preventDefault(){}});await new Promise(r=>setImmediate(r));
+ assert.equal(f.element('post-notice-dialog').open,true);
+});
+
+test('returning to the browser checks notices without reloading the cached feed and hidden tabs do not claim them',async()=>{
+ const queue=[];let calls=0;
+ const f=await fixture({respond:async action=>{if(action==='post-notice-next'){calls++;return {notice:queue.shift() || null};}return {posts:[]};}});
+ const feedCalls=f.calls.filter(c=>c.action==='posts-list').length;
+ queue.push({post:{text:'post'},reason:'spam'});
+ f.context.document.visibilityState='hidden';f.context.document.handlers.visibilitychange();await new Promise(r=>setImmediate(r));assert.equal(calls,1);
+ f.context.document.visibilityState='visible';f.context.document.handlers.visibilitychange();await new Promise(r=>setImmediate(r));
+ assert.equal(f.element('post-notice-dialog').open,true);assert.equal(calls,2);assert.equal(f.calls.filter(c=>c.action==='posts-list').length,feedCalls);
 });

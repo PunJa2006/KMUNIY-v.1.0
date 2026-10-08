@@ -44,7 +44,7 @@ async function fixture({ existing = {}, race = false, guest = false, now = Date.
       const operation = transactionQueue.then(async () => {
       const pending = [], removals = [];
       const result = await fn({
-        get: async ref => race && ['usernames/tester1', 'handles/tester1'].includes(ref.key) ? { exists: true, data: () => ({ uid: 'another-user' }) } : snap(ref),
+        get: async ref => race && ['usernames/tester1', 'handles/tester1'].includes(ref.key) ? { exists: true, data: () => ({ uid: 'another-user' }) } : ref.key ? snap(ref) : ref.get(),
         set: (ref, value) => pending.push([ref.key, value]),
         create: (ref, value) => pending.push([ref.key, value]),
         update: (ref, value) => pending.push([ref.key, { ...records.get(ref.key), ...value }]),
@@ -770,8 +770,8 @@ test('Dev/Admin delete others public posts after confirmation and remove attache
   const f=await fixture({existing,authUid:uid,now});
   assert.equal((await f.request({action:'post-delete',id:'p1'})).code,400);
   const confirmation=(await f.request({action:'moderation-confirm',operation:'post-delete',id:'p1'})).value.confirmation;
-  assert.equal((await f.request({action:'post-delete',id:'p1',confirmation})).code,409);
-  f.setTime(now+3000);assert.equal((await f.request({action:'post-delete',id:'p1',confirmation})).code,200);
+  assert.equal((await f.request({action:'post-delete',id:'p1',confirmation,reason:'Spam'})).code,409);
+  f.setTime(now+3000);assert.equal((await f.request({action:'post-delete',id:'p1',confirmation,reason:'Spam'})).code,200);
   for(const key of ['posts/p1','posts/p1/comments/c1','posts/p1/likes/dev','media/'+id])assert.equal(f.records.has(key),false);
   assert.deepEqual(f.removedFiles,[id]);assert.equal((await f.request({action:'saved-list'})).value.posts.length,0);
   assert.equal((await f.request({action:'post-restore',id:'p1'})).code,404);
@@ -780,13 +780,13 @@ test('Dev/Admin delete others public posts after confirmation and remove attache
 test('expired confirmations and confirmations held by demoted staff cannot authorize deletion',async()=>{
  const now=Date.now(),f=await fixture({existing:roleRecords(),authUid:'admin',now});
  const confirmation=(await f.request({action:'moderation-confirm',operation:'post-delete',id:'p1'})).value.confirmation;
- f.setTime(now+300001);assert.equal((await f.request({action:'post-delete',id:'p1',confirmation})).code,400);
- f.records.delete('roles/admin');assert.equal((await f.request({action:'post-delete',id:'p1',confirmation})).code,403);
+ f.setTime(now+300001);assert.equal((await f.request({action:'post-delete',id:'p1',confirmation,reason:'Spam'})).code,400);
+ f.records.delete('roles/admin');assert.equal((await f.request({action:'post-delete',id:'p1',confirmation,reason:'Spam'})).code,403);
  assert.equal(f.records.has('posts/p1'),true);
 });
 
 test('legacy report recipient keeps only inbox access until explicitly assigned Dev',async()=>{const existing=roleRecords();delete existing['settings/moderation'].developerUid;const f=await fixture({existing,authUid:'dev'});const access=(await f.request({action:'profile-read'})).value;assert.equal(access.role,null);assert.equal(access.canReceiveReports,true);assert.equal(access.canModerate,false);assert.equal((await f.request({action:'role-grant',targetUid:'email-user'})).code,403);});
-test('staff deletion never removes a different own archived post with the same id',async()=>{const now=Date.now(),f=await fixture({existing:{...roleRecords(),'users/admin/archive/p1':{uid:'admin',text:'private keep'}},authUid:'admin',now});const confirmation=(await f.request({action:'moderation-confirm',operation:'post-delete',id:'p1'})).value.confirmation;f.setTime(now+3000);assert.equal((await f.request({action:'post-delete',id:'p1',confirmation})).code,200);assert.equal(f.records.get('users/admin/archive/p1').text,'private keep');});
+test('staff deletion never removes a different own archived post with the same id',async()=>{const now=Date.now(),f=await fixture({existing:{...roleRecords(),'users/admin/archive/p1':{uid:'admin',text:'private keep'}},authUid:'admin',now});const confirmation=(await f.request({action:'moderation-confirm',operation:'post-delete',id:'p1'})).value.confirmation;f.setTime(now+3000);assert.equal((await f.request({action:'post-delete',id:'p1',confirmation,reason:'Spam'})).code,200);assert.equal(f.records.get('users/admin/archive/p1').text,'private keep');});
 
 test('only active Dev/Admin can delete reports and deletion leaves posts/interactions/media/archive untouched',async()=>{
  for(const uid of ['dev','admin']){
@@ -1132,4 +1132,75 @@ test('Guest can create, edit, archive and restore General and Q&A posts',async()
   assert.equal((await f.request({action:'post-restore',id})).code,200);
   assert.equal(f.records.get('posts/'+id).category,category);
  }
+});
+
+test('social identities open member and Guest public profiles by stable identity without leaking private data or archives', async () => {
+  const f = await fixture({existing: {
+    'users/email-user': socialMember,
+    'users/guest': {displayName: 'Guest visitor', isGuest: true, bio: 'Guest bio', photoMediaId: 'hidden'},
+    'users/member': {displayName: 'Member visitor', handle: 'visitor1', profileCompleted: true, email: 'secret@example.invalid', username: 'private-login'},
+    'posts/p1': {uid: 'email-user', text: 'Public post'},
+    'posts/guest-post': {uid: 'guest', text: 'Guest post'},
+    'posts/p1/likes/member': {uid: 'member'},
+    'posts/p1/comments/c1': {uid: 'guest', text: 'Guest comment'},
+    'users/guest/archive/private': {uid: 'guest', text: 'Private archive'}
+  }});
+  f.setUser('member');
+  const detail = await f.request({action: 'post-detail', id: 'p1'});
+  assert.equal(detail.code, 200);
+  assert.equal(detail.value.likes[0].profileUid, 'member');
+  assert.equal(detail.value.comments[0].profileUid, 'guest');
+  for (const person of [detail.value.likes[0], detail.value.comments[0]]) {
+    const result = await f.request({action: 'author-profile', profileUid: person.profileUid});
+    assert.equal(result.code, 200);
+    assert.equal(result.value.profile.displayName, person.displayName);
+    for (const key of ['email', 'username', 'nicknameChanges']) assert.equal(result.value.profile[key], undefined);
+    assert.equal(result.value.posts.some(post => post.text === 'Private archive'), false);
+    if (person.profileUid === 'guest') assert.equal(result.value.profile.photoMediaId, null);
+  }
+  for (const profileUid of ['', '../member', 'x'.repeat(129), 42]) assert.equal((await f.request({action: 'author-profile', profileUid})).code, 400);
+  assert.equal((await f.request({action: 'author-profile', profileUid: 'missing'})).code, 404);
+});
+
+test('staff deletion requires a reason, preserves it with the post snapshot and notifies only the owner once',async()=>{
+ for(const actor of ['admin','dev']){
+  const now=Date.now(),f=await fixture({existing:roleRecords(),authUid:actor,now});
+  const confirmation=(await f.request({action:'moderation-confirm',operation:'post-delete',id:'p1'})).value.confirmation;
+  f.setTime(now+3000);
+  for(const reason of [undefined,'   ',123,'x'.repeat(2001)]){
+   assert.equal((await f.request({action:'post-delete',id:'p1',confirmation,reason})).code,400);
+   assert.equal(f.records.has('posts/p1'),true);assert.equal(f.records.has('users/email-user/postNotices/p1'),false);
+  }
+  const original=f.records.get('posts/p1').text;
+  assert.equal((await f.request({action:'post-delete',id:'p1',confirmation,reason:'  repeated spam  ',targetUid:actor})).code,200);
+  assert.equal(f.records.get('users/email-user/postNotices/p1').reason,'repeated spam');
+  assert.equal((await f.request({action:'post-notice-next',targetUid:'email-user'})).value.notice,null);
+  f.setUser('email-user');
+  const notice=(await f.request({action:'post-notice-next'})).value.notice;
+  assert.equal(notice.post.id,'p1');assert.equal(notice.post.text,original);assert.equal(notice.reason,'repeated spam');
+  assert.equal((await f.request({action:'post-notice-next'})).value.notice,null);
+  assert.equal(f.records.has('users/email-user/postNotices/p1'),false);
+ }
+});
+test('own deletions and unauthorized deletions do not create owner notices',async()=>{
+ const f=await fixture({existing:roleRecords()});
+ f.records.set('posts/other',{uid:'admin',text:'keep'});
+ assert.equal((await f.request({action:'post-delete',id:'other',reason:'forged'})).code,403);
+ assert.equal(f.records.has('users/admin/postNotices/other'),false);
+ assert.equal((await f.request({action:'post-delete',id:'p1'})).code,200);
+ assert.equal((await f.request({action:'post-notice-next'})).value.notice,null);
+ const missing=await fixture();assert.equal((await missing.request({action:'post-notice-next'})).code,403);
+});
+test('concurrent owner sessions claim each notice at most once and keep other owners private',async()=>{
+ const stamp=offset=>({toDate:()=>new Date(1700000000000+offset)});
+ const notice=(id,offset)=>({reason:'reason '+id,post:{id,text:'removed '+id},createdAt:stamp(offset)});
+ const f=await fixture({existing:{...roleRecords(),'users/email-user/postNotices/n1':notice('p1',0),'users/email-user/postNotices/n2':notice('p2',1),'users/admin/postNotices/private':notice('private',0)}});
+ const results=await Promise.all(Array.from({length:3},()=>f.request({action:'post-notice-next',uid:'admin'})));
+ assert.deepEqual(results.map(r=>r.value.notice?.post.id || null),['p1','p2',null]);
+ assert.equal(f.records.has('users/admin/postNotices/private'),true);
+});
+test('Guest owners receive moderation notices without granting moderation authority',async()=>{
+ const f=await fixture({guest:true,existing:{'users/email-user':{isGuest:true,displayName:'Guest'},'users/email-user/postNotices/p1':{post:{id:'p1',text:'Guest post'},reason:'spam',createdAt:{toDate:()=>new Date()}}}});
+ assert.equal((await f.request({action:'post-notice-next'})).value.notice.reason,'spam');
+ assert.equal((await f.request({action:'post-notice-next'})).value.notice,null);
 });
