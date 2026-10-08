@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ message: 'Method not allowed' }); }
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    if (!body || ![...moderationActions, 'profile', 'profile-read', 'username-login', 'username-register', 'posts-list', 'post-create', 'my-posts', 'archive-list', 'post-archive', 'post-restore', 'profile-update', 'post-detail', 'post-like', 'comment-create', 'comment-update', 'comment-delete', 'comment-like', 'author-profile', 'search-users', 'trending-tags', 'post-update', 'post-delete', 'post-save', 'saved-list', 'report-create', 'usage-report-create', 'contact-admin-create', 'reports-list', 'report-delete'].includes(body.action)) throw fail(400, 'คำขอไม่ถูกต้อง');
+    if (!body || ![...moderationActions, 'profile', 'profile-read', 'username-login', 'username-register', 'posts-list', 'post-create', 'my-posts', 'archive-list', 'post-archive', 'post-restore', 'profile-update', 'post-detail', 'post-like', 'comment-create', 'comment-update', 'comment-delete', 'comment-like', 'author-profile', 'search-users', 'trending-tags', 'post-notice-next', 'post-update', 'post-delete', 'post-save', 'saved-list', 'report-create', 'usage-report-create', 'contact-admin-create', 'reports-list', 'report-delete'].includes(body.action)) throw fail(400, 'คำขอไม่ถูกต้อง');
     if (!['username-login', 'username-register'].includes(body.action) && !String(req.headers.authorization || '').startsWith('Bearer ')) throw fail(401, 'กรุณาเข้าสู่ระบบใหม่');
     const { auth, db } = services();
     if (body.action === 'username-register') {
@@ -113,7 +113,7 @@ export default async function handler(req, res) {
     if(await banned(db,claims.uid) && body.action!=='usage-report-create')throw Object.assign(fail(403,'บัญชีนี้ถูกแบน กรุณาติดต่อ Dev หรือ Admin'),{code:'ACCOUNT_BANNED'});
     const isGuest = claims.firebase?.sign_in_provider === 'anonymous';
     const profileRef = db.collection('users').doc(claims.uid);
-    if ([...moderationActions, 'posts-list', 'post-create', 'my-posts', 'archive-list', 'post-archive', 'post-restore', 'profile-update', 'post-detail', 'post-like', 'comment-create', 'comment-update', 'comment-delete', 'comment-like', 'author-profile', 'search-users', 'trending-tags', 'post-update', 'post-delete', 'post-save', 'saved-list', 'report-create', 'usage-report-create', 'contact-admin-create', 'reports-list', 'report-delete'].includes(body.action)) {
+    if ([...moderationActions, 'posts-list', 'post-create', 'my-posts', 'archive-list', 'post-archive', 'post-restore', 'profile-update', 'post-detail', 'post-like', 'comment-create', 'comment-update', 'comment-delete', 'comment-like', 'author-profile', 'search-users', 'trending-tags', 'post-notice-next', 'post-update', 'post-delete', 'post-save', 'saved-list', 'report-create', 'usage-report-create', 'contact-admin-create', 'reports-list', 'report-delete'].includes(body.action)) {
       const member = await profileRef.get();
       if (!member.exists || (!isGuest && (member.data().isGuest || (!member.data().username && !member.data().email)))) throw fail(403, 'กรุณาสมัครสมาชิกก่อนใช้งาน');
       const moderation=await handleModeration({body,db,claims,fail,FieldValue});
@@ -276,7 +276,7 @@ export default async function handler(req, res) {
           const person = uid === claims.uid ? member : await db.collection('users').doc(uid).get();
           const data = await publicPerson(uid, person.exists ? person.data() : {});
           const authorRole = uid === post.data().uid && person.exists && !data.isGuest && !data.suspended ? await roleFor(db,uid) : null;
-          people.set(uid, { ...(uid === post.data().uid ? { role: authorRole } : {}), suspended: data.suspended, displayName: data.displayName || 'ผู้ใช้', handle: data.handle || null, photoId: data.isGuest ? null : data.photoMediaId || null });
+          people.set(uid, { profileUid: uid, ...(uid === post.data().uid ? { role: authorRole } : {}), suspended: data.suspended, displayName: data.displayName || 'ผู้ใช้', handle: data.handle || null, photoId: data.isGuest ? null : data.photoMediaId || null });
         }));
         const data = post.data();
         return res.status(200).json({
@@ -366,7 +366,10 @@ export default async function handler(req, res) {
       if (['posts-list', 'my-posts', 'archive-list', 'author-profile', 'saved-list'].includes(body.action)) {
         let viewedAuthor = null, authorId = null;
         if (body.action === 'author-profile') {
-          if (body.handle !== undefined) {
+          if (body.profileUid !== undefined) {
+            if (typeof body.profileUid !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.profileUid)) throw fail(400, 'ไม่พบโปรไฟล์');
+            authorId = body.profileUid;
+          } else if (body.handle !== undefined) {
             const handle = normalizeUsername(body.handle);
             if (!handle) throw fail(400, 'กรุณาพิมพ์ @username ที่ต้องการค้นหา');
             const mapping = await db.collection('handles').doc(handle).get();
@@ -382,7 +385,7 @@ export default async function handler(req, res) {
           const author = await db.collection('users').doc(authorId).get();
           if (!author.exists) throw fail(404, 'ไม่พบโปรไฟล์');
           const person = author.data();
-          if (body.handle !== undefined && (person.isGuest || person.profileCompleted !== true || person.handle !== normalizeUsername(body.handle))) throw fail(404, 'ไม่พบโปรไฟล์');
+          if (body.profileUid === undefined && body.handle !== undefined && (person.isGuest || person.profileCompleted !== true || person.handle !== normalizeUsername(body.handle))) throw fail(404, 'ไม่พบโปรไฟล์');
           const visible = await publicPerson(authorId, person);
           const access=await permissions(db,claims.uid),targetRole=await assignedRole(db,authorId);
           viewedAuthor = { suspended:visible.suspended, role:targetRole, ...(access.canModerate && authorId!==claims.uid ? {management:{targetUid:authorId,canManageRoles:access.canManageRoles && targetRole!=='dev' && !person.isGuest,canGrantMerchant:access.canGrantMerchant && !targetRole && !person.isGuest,canBan:targetRole!=='dev',banned:visible.suspended}} : {}), displayName: visible.displayName || 'ผู้ใช้', handle: visible.handle || null, bio: visible.bio || '', photoMediaId: visible.isGuest ? null : visible.photoMediaId || null };
