@@ -9,7 +9,7 @@ import { runInNewContext } from 'node:vm';
 async function fixture({ guest = false, completed = true, posts = [], respond = null, cooldown = 0, language = 'th', languageStorageFails = false, admin = false, role = null } = {}) {
   const fields = new Map(), storage = new Map(), calls = [];
   const element = id => {
-    if (!fields.has(id)) fields.set(id, { hidden: false, value: '', maxLength:5000, selectionStart:0, selectionEnd:0, setRangeText(text,start,end){this.value=this.value.slice(0,start)+text+this.value.slice(end);this.selectionStart=this.selectionEnd=start+text.length;}, dataset: {}, children: [], handlers: {}, getAttribute(name) { return this[name]; }, setAttribute(name, value) { this[name] = value; }, addEventListener(name, fn) { this.handlers[name] = fn; }, append(...items) { this.children.push(...items); }, replaceChildren(...items) { this.children = items; }, showModal() { this.open = true; }, close() { this.open = false; }, focus() {} });
+    if (!fields.has(id)) fields.set(id, { hidden: false, value: '', maxLength:5000, selectionStart:0, selectionEnd:0, setRangeText(text,start,end){this.value=this.value.slice(0,start)+text+this.value.slice(end);this.selectionStart=this.selectionEnd=start+text.length;}, dataset: {}, children: [], handlers: {}, getAttribute(name) { return this[name]; }, setAttribute(name, value) { this[name] = value; }, addEventListener(name, fn) { this.handlers[name] = fn; }, append(...items) { this.children.push(...items); }, replaceChildren(...items) { this.children = items; }, showModal() { this.open = true; }, close() { this.open = false; }, focus() { this.focusCalls = (this.focusCalls || 0) + 1; } });
     return fields.get(id);
   };
   const user = { uid: 'owner', isAnonymous: guest };
@@ -36,13 +36,16 @@ async function fixture({ guest = false, completed = true, posts = [], respond = 
 test('settings contains theme and archive; Me loads personal posts and profile', async () => {
   const f = await fixture();
   await f.click('open-settings');
-  assert.equal(f.element('settings-dialog').open, true);
-  f.element('theme').value = 'dark';
-  f.element('theme').handlers.change();
+  assert.equal(f.element('settings-page').hidden, false);
+  assert.equal(f.element('feed-view').hidden, true);
+  assert.equal(f.element('open-settings')['aria-current'], 'page');
+  await f.click('theme-dark');
+  assert.equal(f.element('theme-dark')['aria-pressed'], 'true');
+  assert.equal(f.element('theme-light')['aria-pressed'], 'false');
   assert.equal(f.context.document.documentElement.dataset.theme, 'dark');
   assert.equal(f.storage.get('community-theme:owner'), 'dark');
   await f.click('open-archive');
-  assert.equal(f.element('settings-dialog').open, false);
+  assert.equal(f.element('settings-page').hidden, true);
   assert.equal(f.calls.at(-1).action, 'archive-list');
   assert.equal(f.element('me-profile').hidden, true);
   await f.click('me');
@@ -214,25 +217,30 @@ test('English UI preserves user content and stored Thai category keys', async ()
   const allText = element => [element.textContent || '', ...(element.children || []).map(allText)].join(' ');
   assert.match(allText(f.element('feed')), /สมชาย/);
   assert.match(allText(f.element('feed')), /ข้อความของผู้ใช้/);
-  assert.match(allText(f.element('feed')), /Category: Marketplace/);
+  assert.match(allText(f.element('feed')), /Category:\s+Marketplace/);
   await f.click('category-market');
   assert.equal(f.calls.at(-1).data.category, 'ขายของ');
   assert.equal(f.element('feed-heading').textContent, 'Community feed · Marketplace');
 });
 
-test('search popup lists trends and lets a result open a public profile without a post id',async()=>{
+test('search page lists trends and lets a result open a public profile without a post id',async()=>{
  const f=await fixture({respond:async(action)=>{
   if(action==='trending-tags')return {tags:[{tag:'kmutnb',count:3}]};
   if(action==='search-users')return {users:[{displayName:'Other',handle:'other1',photoId:null}]};
   if(action==='author-profile')return {profile:{displayName:'Other',handle:'other1',bio:'About'},posts:[]};
   return {posts:[]};
  }});
- await f.click('open-search');assert.equal(f.element('search-dialog').open,true);
+ await f.click('open-search');assert.equal(f.element('search-page').hidden,false);
+ assert.equal(f.element('feed-view').hidden,true);
+ assert.equal(f.element('open-search')['aria-current'],'page');
+ assert.equal(f.element('home')['aria-current'],'false');
+ assert.equal(f.element('search-input').focusCalls || 0,0);
+ assert.equal(f.calls.filter(item=>item.action==='posts-list').length,1);
  assert.equal(f.element('trending-tags').children[0].children[0].children[0].textContent,'#kmutnb');
  f.element('search-input').value='@other';await f.element('search-form').handlers.submit({preventDefault(){}});
  assert.equal(f.calls.at(-1).action,'search-users');assert.equal(f.calls.at(-1).data.query,'@other');
  await f.element('search-results').children[0].handlers.click();await new Promise(resolve=>setImmediate(resolve));
- assert.equal(f.element('search-dialog').open,false);assert.equal(f.calls.at(-1).action,'author-profile');assert.equal(f.calls.at(-1).data.handle,'other1');
+ assert.equal(f.element('search-page').hidden,true);assert.equal(f.calls.at(-1).action,'author-profile');assert.equal(f.calls.at(-1).data.handle,'other1');
  assert.equal(f.element('author-name').textContent,'Other');
 });
 
@@ -246,10 +254,10 @@ test('trending and post hashtags filter the feed; title resets tag and category'
  assert.equal(f.calls.at(-1).data.hashtag,undefined);assert.equal(f.element('hashtag-filter').hidden,true);
 });
 
-test('closed search popup discards delayed trend response',async()=>{
+test('closed search page discards delayed trend response',async()=>{
  let resolveTrends;
  const f=await fixture({respond:async(action)=>action==='trending-tags'?new Promise(resolve=>resolveTrends=resolve):{posts:[]}});
- const pending=f.element('open-search').handlers.click();await f.click('close-search');
+ const pending=f.element('open-search').handlers.click();await f.click('home');
  resolveTrends({tags:[{tag:'late',count:9}]});await pending;
  assert.equal(f.element('trending-tags').children.length,0);
 });
@@ -394,14 +402,14 @@ test('history keeps successful no-result searches and valid hashtags, but exclud
  const f=await fixture({language:'en',respond:async(action,data)=>action==='trending-tags'?{tags:[]}:action==='search-users'?(data.query==='invalid'?Promise.reject(Error('invalid')):{users:[]}):{posts:[]}});
  await f.click('open-search');f.element('search-input').value='missing1';await f.element('search-form').handlers.submit({preventDefault(){}});assert.equal(f.element('search-history-list').children[0].children[0].children[1].textContent,'Search again');
  f.element('search-input').value='invalid';await f.element('search-form').handlers.submit({preventDefault(){}});assert.equal(f.element('search-history-list').children.length,1);
- f.element('search-input').value='#มหาลัย';await f.element('search-form').handlers.submit({preventDefault(){}});assert.equal(f.element('search-dialog').open,false);await f.click('open-search');assert.equal(f.element('search-history-list').children[0].children[0].children[0].textContent,'#มหาลัย');
+ f.element('search-input').value='#มหาลัย';await f.element('search-form').handlers.submit({preventDefault(){}});assert.equal(f.element('search-page').hidden,true);await f.click('open-search');assert.equal(f.element('search-history-list').children[0].children[0].children[0].textContent,'#มหาลัย');
 });
 
 
 test('usage-report popup preserves drafts and failures, rejects empty messages, prevents duplicate sends and clears on success',async()=>{
  let reject=true,resolveSend;
  const f=await fixture({respond:async action=>{if(action==='usage-report-create'){if(reject)throw Error('server unavailable');return new Promise(resolve=>resolveSend=resolve);}return {posts:[]};}});
- await f.click('open-usage-report');assert.equal(f.element('usage-report-dialog').open,true);f.element('usage-report-details').value=' draft problem ';await f.click('cancel-usage-report');await f.click('open-usage-report');assert.equal(f.element('usage-report-details').value,' draft problem ');
+ await f.click('open-settings');await f.click('open-usage-report');assert.equal(f.element('settings-page').hidden,false);assert.equal(f.element('usage-report-dialog').open,true);f.element('usage-report-details').value=' draft problem ';await f.click('cancel-usage-report');await f.click('open-usage-report');assert.equal(f.element('usage-report-details').value,' draft problem ');
  f.element('usage-report-details').value=' ';await f.element('usage-report-form').handlers.submit({preventDefault(){}});assert.equal(f.calls.some(c=>c.action==='usage-report-create'),false);
  f.element('usage-report-details').value=' draft problem ';await f.element('usage-report-form').handlers.submit({preventDefault(){}});assert.equal(f.element('usage-report-dialog').open,true);assert.equal(f.element('usage-report-details').value,' draft problem ');assert.equal(f.element('usage-report-fields').disabled,false);
  reject=false;const pending=f.element('usage-report-form').handlers.submit({preventDefault(){}});assert.equal(f.element('usage-report-fields').disabled,true);await f.element('usage-report-form').handlers.submit({preventDefault(){}});await f.click('cancel-usage-report');assert.equal(f.element('usage-report-dialog').open,true);assert.equal(f.calls.filter(c=>c.action==='usage-report-create').length,2);
@@ -433,21 +441,22 @@ test('a delayed previous report category cannot replace the currently selected c
 
 test('logout needs a fresh 3-second confirmation; cancel preserves the account and early forced clicks cannot sign out',async()=>{
  const f=await fixture();await f.click('open-settings');await f.click('logout');assert.equal(f.element('logout-dialog').open,true);assert.equal(f.element('confirm-logout').textContent,'แน่ใจ (3)');assert.equal(f.element('confirm-logout').disabled,true);
- await f.click('confirm-logout');assert.equal(f.calls.some(c=>c.action==='signOut'),false);f.advanceTime(3000);await f.click('cancel-logout');assert.equal(f.element('logout-dialog').open,false);assert.equal(f.element('settings-dialog').open,true);assert.equal(f.calls.some(c=>c.action==='signOut'),false);
+ await f.click('confirm-logout');assert.equal(f.calls.some(c=>c.action==='signOut'),false);f.advanceTime(3000);await f.click('cancel-logout');assert.equal(f.element('logout-dialog').open,false);assert.equal(f.element('settings-page').hidden,false);assert.equal(f.calls.some(c=>c.action==='signOut'),false);
  await f.click('logout');assert.equal(f.element('confirm-logout').disabled,true);f.advanceTime(2999);await f.click('confirm-logout');assert.equal(f.calls.some(c=>c.action==='signOut'),false);f.advanceTime(1);await f.click('confirm-logout');assert.equal(f.calls.filter(c=>c.action==='signOut').length,1);assert.equal(f.calls.at(-1),'/');
 });
 
-test('Guest composer locks other categories, defaults to Q&A, preserves draft and rejects forged category before upload',async()=>{
+test('Guest composer allows General and Q&A, preserves General draft and rejects locked categories before upload',async()=>{
  const f=await fixture({guest:true});
  await f.click('open-post');
  assert.equal(f.element('post-category').value,'ถาม-ตอบ');assert.equal(f.element('guest-category-note').hidden,false);
- for(const id of ['post-category-placeholder','post-category-market','post-category-lost','post-category-general'])assert.equal(f.element(id).disabled,true);
- f.element('post-text').value='Guest question';await f.click('cancel-post');await f.click('open-post');
- assert.equal(f.element('post-text').value,'Guest question');assert.equal(f.element('post-category').value,'ถาม-ตอบ');
+ for(const id of ['post-category-placeholder','post-category-market','post-category-lost'])assert.equal(f.element(id).disabled,true);
+ assert.equal(f.element('post-category-general').disabled,false);
+ f.element('post-category').value='ทั่วไป';f.element('post-text').value='Guest question';await f.click('cancel-post');await f.click('open-post');
+ assert.equal(f.element('post-text').value,'Guest question');assert.equal(f.element('post-category').value,'ทั่วไป');
  f.element('post-category').value='ขายของ';await f.element('post-form').handlers.submit({preventDefault(){}});
  assert.equal(f.calls.some(c=>c.action==='post-create'),false);assert.equal(f.element('post-status').textContent,'หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login');
- f.element('post-category').value='ถาม-ตอบ';await f.element('post-form').handlers.submit({preventDefault(){}});
- assert.equal(f.calls.find(c=>c.action==='post-create').data.category,'ถาม-ตอบ');
+ f.element('post-category').value='ทั่วไป';await f.element('post-form').handlers.submit({preventDefault(){}});
+ assert.equal(f.calls.find(c=>c.action==='post-create').data.category,'ทั่วไป');
 });
 test('member composer keeps categories unlocked and hides Guest notice',async()=>{
  const f=await fixture();await f.click('open-post');
@@ -504,7 +513,7 @@ test('live search matches one-character prefixes, narrows results, opens a profi
  }
  assert.equal(f.element('search-results').children[0].children[1].children[0].textContent,'Toto');
  await f.element('search-results').children[0].handlers.click();await new Promise(resolve=>setImmediate(resolve));
- assert.equal(f.calls.at(-1).action,'author-profile');assert.equal(f.calls.at(-1).data.handle,'toto');assert.equal(f.element('search-dialog').open,false);
+ assert.equal(f.calls.at(-1).action,'author-profile');assert.equal(f.calls.at(-1).data.handle,'toto');assert.equal(f.element('search-page').hidden,true);
  await f.click('open-search');assert.equal(f.element('search-history-list').children.length,1);assert.equal(f.element('search-history-list').children[0].children[0].children[0].textContent,'@toto');
 });
 test('live search combines rapid keystrokes; Enter cancels pending suggestions and keeps explicit query history',async()=>{
@@ -523,10 +532,10 @@ test('live search discards stale responses and cancels on empty input, hashtags,
  pending[0].resolve({users:[{displayName:'Toded',handle:'toded'}]});await new Promise(resolve=>setImmediate(resolve));
  assert.equal(f.element('search-results').children.length,1);assert.equal(f.element('search-results').children[0].children[1].children[0].textContent,'Toto');
  for(const value of ['', '@', '#Test', 'bad/', 'ไทย']){f.element('search-input').value=value;f.element('search-input').handlers.input({});f.advanceTime(200);}
- assert.equal(pending.length,2);assert.equal(f.element('search-results').children.length,0);assert.equal(f.element('search-status').textContent,'');assert.equal(f.element('search-dialog').open,true);
+ assert.equal(pending.length,2);assert.equal(f.element('search-results').children.length,0);assert.equal(f.element('search-status').textContent,'');assert.equal(f.element('search-page').hidden,false);
  f.element('search-input').value='T';f.element('search-input').handlers.input({isComposing:true});f.advanceTime(200);assert.equal(pending.length,2);
- f.element('search-input').handlers.compositionend({});f.advanceTime(200);assert.equal(pending.length,3);await f.click('close-search');pending[2].reject(Error('late failure'));await new Promise(resolve=>setImmediate(resolve));assert.equal(f.element('search-status').textContent,'');
- await f.click('open-search');f.element('search-input').value='To';f.element('search-input').handlers.input({});await f.click('close-search');f.advanceTime(200);assert.equal(pending.length,3);
+ f.element('search-input').handlers.compositionend({});f.advanceTime(200);assert.equal(pending.length,3);await f.click('home');pending[2].reject(Error('late failure'));await new Promise(resolve=>setImmediate(resolve));assert.equal(f.element('search-status').textContent,'');
+ await f.click('open-search');f.element('search-input').value='To';f.element('search-input').handlers.input({});await f.click('home');f.advanceTime(200);assert.equal(pending.length,3);
 });
 
 test('hashtag button inserts at the cursor with a space when needed and leaves surrounding text intact',async()=>{
@@ -567,7 +576,7 @@ test('suspended post author never shows a role badge even if old response data c
 test('contact admin preserves drafts on cancel/error, rejects empty input and prevents duplicate sends',async()=>{
  let reject=true,resolveSend;
  const f=await fixture({respond:async action=>action==='contact-admin-create'?(reject?Promise.reject(Error('unavailable')):new Promise(resolve=>resolveSend=resolve)):{posts:[]}});
- await f.click('open-contact-admin');assert.equal(f.element('contact-admin-dialog').open,true);
+ await f.click('open-settings');await f.click('open-contact-admin');assert.equal(f.element('settings-page').hidden,false);assert.equal(f.element('contact-admin-dialog').open,true);
  f.element('contact-admin-details').value=' draft ';await f.click('cancel-contact-admin');await f.click('open-contact-admin');assert.equal(f.element('contact-admin-details').value,' draft ');
  f.element('contact-admin-details').value=' ';await f.element('contact-admin-form').handlers.submit({preventDefault(){}});assert.equal(f.calls.some(c=>c.action==='contact-admin-create'),false);
  f.element('contact-admin-details').value=' draft ';await f.element('contact-admin-form').handlers.submit({preventDefault(){}});assert.equal(f.element('contact-admin-dialog').open,true);assert.equal(f.element('contact-admin-details').value,' draft ');
@@ -587,15 +596,91 @@ test('announcement composer is staff-only and ordinary members cannot submit a f
   const f=await fixture({role});await f.click('open-post');const staff=['admin','dev'].includes(role);assert.equal(f.element('post-category-announcement').hidden,!staff);assert.equal(f.element('post-category-announcement').disabled,!staff);
   f.element('post-category').value='ประกาศ';f.element('post-text').value='announcement';await f.element('post-form').handlers.submit({preventDefault(){}});assert.equal(f.calls.some(c=>c.action==='post-create'),staff);
  }
- const guest=await fixture({guest:true});assert.equal(guest.element('post-category-announcement').hidden,true);assert.equal(guest.element('post-category-general').disabled,true);
+ const guest=await fixture({guest:true});assert.equal(guest.element('post-category-announcement').hidden,true);assert.equal(guest.element('post-category-general').disabled,false);
 });
 test('announcement ticker renders API announcements independently of category filters and opens their post',async()=>{
  const post={id:'a1',displayName:'Admin',text:'<script>literal</script>',category:'ประกาศ',media:[]};
  const f=await fixture({respond:async(action,data)=>action==='posts-list'?{posts:data.category==='ทั้งหมด'?[post]:[],announcements:[post]}:action==='post-detail'?{post,comments:[],likes:[]}:{posts:[]}});
- assert.equal(f.element('feed').children.length,1);const track=f.element('announcement-track');assert.equal(track.children[0].textContent,'ประกาศ: <script>literal</script>');
- await f.click('category-general');assert.equal(f.element('feed').children.length,0);assert.equal(track.children[0].textContent,'ประกาศ: <script>literal</script>');
- await track.children[0].handlers.click();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.element('comments-dialog').open,true);assert.equal(f.calls.at(-1).data.id,'a1');
+ assert.equal(f.element('feed').children.length,1);const track=f.element('announcement-track');assert.equal(track.children[0].children[0].children[0].textContent,'ประกาศ: <script>literal</script>');
+ await f.click('category-general');assert.equal(f.element('feed').children.length,0);assert.equal(track.children[0].children[0].children[0].textContent,'ประกาศ: <script>literal</script>');
+ await track.children[0].children[0].children[0].handlers.click();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.element('comments-dialog').open,true);assert.equal(f.calls.at(-1).data.id,'a1');
 });
 test('an empty announcement list clears previous ticker content and restores the welcome message',async()=>{
- let announcements=[{id:'a1',text:'old'}];const f=await fixture({respond:async()=>({posts:[],announcements})});assert.equal(f.element('announcement-track').children.length,1);announcements=[];await f.click('home');assert.equal(f.element('announcement-track').children.length,0);assert.equal(f.element('announcement-track').textContent,'System : Welcome to my website kub ^_^');
+ let announcements=[{id:'a1',text:'old'}];const f=await fixture({respond:async()=>({posts:[],announcements})});assert.equal(f.element('announcement-track').children.length,2);announcements=[];await f.click('home');assert.equal(f.element('announcement-track').children.length,2);assert.equal(f.element('announcement-track').children[0].children[0].children[0].textContent,'System : Welcome to my website kub ^_^');
+});
+
+test('selected post attachment remains in native picker until cleared or successfully posted',async()=>{
+ const f=await fixture(),uploads=[];
+ f.context.URL={createObjectURL:()=> 'blob:phone',revokeObjectURL(){}};
+ f.context.uploadMedia=async file=>{uploads.push(file);return {id:'phone-photo'};};
+ const file={name:'phone.jpg',type:'image/jpeg',size:500};
+ const input=f.element('post-files');input.files=[file];input.value='C:\\fakepath\\phone.jpg';
+ await input.handlers.change();assert.equal(input.value,'C:\\fakepath\\phone.jpg');
+ assert.equal(f.element('media-preview').children.length,1);
+ await f.click('open-post');await f.click('cancel-post');assert.equal(input.value,'C:\\fakepath\\phone.jpg');
+ f.element('post-category').value='ทั่วไป';
+ await f.element('post-form').handlers.submit({preventDefault(){}});
+ assert.deepEqual(uploads,[file]);assert.equal(input.value,'');assert.equal(f.calls.find(c=>c.action==='post-create').data.mediaIds[0],'phone-photo');
+ input.files=[file];input.value='C:\\fakepath\\phone.jpg';await input.handlers.change();
+ await f.click('clear-files');assert.equal(input.value,'');assert.equal(f.element('media-preview').children.length,0);
+});
+test('profile photo keeps its filename after selection and uploads the selected image on save',async()=>{
+ const f=await fixture(),uploads=[];
+ f.context.URL={createObjectURL:()=> 'blob:phone',revokeObjectURL(){}};
+ f.context.uploadMedia=async file=>{uploads.push(file);return {id:'phone-avatar'};};
+ await f.click('edit-profile');
+ const file={name:'phone.jpg',type:'image/jpeg',size:500};
+ const input=f.element('edit-photo');input.files=[file];input.value='C:\\fakepath\\phone.jpg';
+ await input.handlers.change();assert.equal(input.value,'C:\\fakepath\\phone.jpg');
+ assert.equal(f.element('photo-preview').src,'blob:phone');
+ await f.element('edit-form').handlers.submit({preventDefault(){}});
+ assert.deepEqual(uploads,[file]);assert.equal(f.calls.find(c=>c.action==='profile-update').data.photoMediaId,'phone-avatar');assert.equal(input.value,'');
+});
+
+
+
+test('feed skeleton stays pending and is replaced by the successful response', async () => {
+  let finish;
+  const request = new Promise(resolve => { finish = resolve; });
+  const f = await fixture({respond: action => action === 'posts-list' ? request : {posts: []}});
+  assert.equal(f.element('initial-loading').hidden, true);
+  assert.equal(f.element('feed')['aria-busy'], 'true');
+  assert.equal(f.element('feed').children.length, 3);
+  assert.equal(f.element('feed').children[0].className, 'loading-card');
+  assert.equal(f.element('feed').children[0]['aria-hidden'], 'true');
+  finish({posts: [{id: 'loaded', displayName: 'Member', text: 'Loaded', category: 'ทั่วไป', media: []}]});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.element('feed')['aria-busy'], 'false');
+  assert.equal(f.element('feed-status').className, '');
+  assert.equal(f.element('feed').children.length, 1);
+  assert.equal(f.element('feed').children[0].className, 'post-card');
+});
+
+test('failed feed request removes skeletons and makes the error visible', async () => {
+  let fail;
+  const request = new Promise((resolve, reject) => { fail = reject; });
+  const f = await fixture({respond: action => action === 'posts-list' ? request : {posts: []}});
+  fail(new Error('Network unavailable'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.element('feed')['aria-busy'], 'false');
+  assert.equal(f.element('feed').children.length, 0);
+  assert.equal(f.element('feed-status').textContent, 'Network unavailable');
+  assert.equal(f.element('feed-status').className, '');
+});
+
+test('a stale feed response cannot clear a newer view loading state', async () => {
+  let finishHome, finishMe;
+  const home = new Promise(resolve => { finishHome = resolve; });
+  const me = new Promise(resolve => { finishMe = resolve; });
+  const f = await fixture({respond: action => action === 'posts-list' ? home : action === 'my-posts' ? me : {posts: []}});
+  await f.click('me');
+  finishHome({posts: []});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.element('feed')['aria-busy'], 'true');
+  assert.equal(f.element('feed').children[0].className, 'loading-card');
+  finishMe({posts: []});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.element('feed')['aria-busy'], 'false');
+  assert.equal(f.element('feed').children.length, 0);
+  assert.equal(f.element('feed-status').textContent, 'คุณยังไม่มีโพสต์');
 });

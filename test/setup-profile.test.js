@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
-async function fixture({ guest = false, completed = false, saveFails = false } = {}) {
+async function fixture({ guest = false, completed = false, saveFails = false, language = 'th' } = {}) {
   const fields = new Map(), calls = [];
   const element = id => {
     if (!fields.has(id)) fields.set(id, { value: '', files: [], handlers: {},showModal(){this.open=true;},close(){this.open=false;},addEventListener(name, fn) { this.handlers[name] = fn; } });
@@ -14,7 +14,7 @@ async function fixture({ guest = false, completed = false, saveFails = false } =
   const sdk = { auth: { currentUser: { isAnonymous: guest, getIdToken: async () => 'test-token' } },signOut:async()=>calls.push({action:'signOut'}) };
   const source = (await readFile(new URL('../public/setup-profile.js', import.meta.url), 'utf8')).replace(/^\uFEFF?import .*;\r?\n/, '');
   await runInNewContext(`(async () => { ${source} })()`, {
-    createLogoutConfirmation,setInterval,clearInterval,t, localizeError, dateLocale, document: { getElementById: element }, status, connect: async () => sdk,
+    uploadMedia:async()=>{calls.push({action:"upload"});return {id:"test-photo"};},createLogoutConfirmation,setInterval,clearInterval,t:(message,values)=>t(message,values,language), localizeError:message=>localizeError(message,language), dateLocale:()=>dateLocale(language), document: { getElementById: element }, status, connect: async () => sdk,
     api: async (action, data) => {
       calls.push({ action, data });
       if (action === 'profile-read') return { displayName: 'member', username: 'login1', handle: 'member1', profileCompleted: completed };

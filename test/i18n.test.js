@@ -2,17 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {t,localizeError,dateLocale,getLanguage,setLanguage,LANGUAGE_KEY} from '../public/i18n.js';
 
-test('language defaults to Thai and persists safely with no effect on other preferences', () => {
+test('language defaults to English and preserves explicitly selected Thai and other preferences', () => {
   const previous = globalThis.localStorage;
   const values = new Map([['community-last-theme','dark'],['firebase-session','unchanged']]);
   globalThis.localStorage = {getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)};
   try {
-    assert.equal(getLanguage(),'th');
+    assert.equal(getLanguage(),'en');
     setLanguage('en'); assert.equal(values.get(LANGUAGE_KEY),'en'); assert.equal(getLanguage(),'en');
     assert.equal(dateLocale(),'en-US'); assert.equal(t('ตั้งค่า'),'Settings');
     assert.equal(values.get('community-last-theme'),'dark'); assert.equal(values.get('firebase-session'),'unchanged');
-    setLanguage('th'); assert.equal(dateLocale(),'th-TH'); assert.equal(t('ตั้งค่า'),'ตั้งค่า');
+    setLanguage('th'); assert.equal(getLanguage(),'th'); assert.equal(dateLocale(),'th-TH'); assert.equal(t('ตั้งค่า'),'ตั้งค่า');
     assert.throws(()=>setLanguage('de'));
+    values.set(LANGUAGE_KEY,'invalid'); assert.equal(getLanguage(),'en');
+    globalThis.localStorage={getItem(){throw new Error('Storage unavailable');}};
+    assert.equal(getLanguage(),'en');
   } finally { if(previous === undefined) delete globalThis.localStorage; else globalThis.localStorage = previous; }
 });
 

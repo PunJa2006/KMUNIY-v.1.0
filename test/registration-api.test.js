@@ -975,7 +975,7 @@ test('ban appeals are classified from server restriction state, retain authentic
 test('Guest category restriction uses verified auth and leaves blocked requests without posts, media changes or cooldown',async()=>{
  const id='11111111-1111-4111-8111-111111111111';
  const f=await fixture({guest:true,existing:{'users/email-user':{isGuest:false,displayName:'Guest'},['media/'+id]:{uid:'email-user',type:'image/png',size:10}}});
- for(const category of ['ทั่วไป','ขายของ','ของหาย']){
+ for(const category of ['ขายของ','ของหาย','ประกาศ']){
   const result=await f.request({action:'post-create',text:'blocked',category,mediaIds:[id],isGuest:false});
   assert.equal(result.code,403);assert.equal(result.value.message,'หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login');
  }
@@ -985,7 +985,7 @@ test('Guest category restriction uses verified auth and leaves blocked requests 
 test('Guest cannot change post category or republish a locked category from archive',async()=>{
  const post={uid:'email-user',text:'original',category:'ถาม-ตอบ',media:[]};
  const f=await fixture({guest:true,existing:{'users/email-user':{isGuest:true,displayName:'Guest'},'posts/p1':post,'users/email-user/archive/old':{...post,category:'ขายของ'}}});
- for(const category of ['ทั่วไป','ขายของ','ของหาย'])assert.equal((await f.request({action:'post-update',id:'p1',text:'changed',category})).code,403);
+ for(const category of ['ขายของ','ของหาย','ประกาศ'])assert.equal((await f.request({action:'post-update',id:'p1',text:'changed',category})).code,403);
  assert.equal(f.records.get('posts/p1').text,'original');
  assert.equal((await f.request({action:'post-restore',id:'old'})).code,403);assert.equal(f.records.has('users/email-user/archive/old'),true);assert.equal(f.records.has('posts/old'),false);
  assert.equal((await f.request({action:'post-update',id:'old',text:'converted',category:'ถาม-ตอบ'})).code,200);
@@ -1120,4 +1120,16 @@ test('announcements reach every reader in both feed and ticker and follow edits,
 test('removed urgent category is read as General without removing old posts and cannot be used for new posts',async()=>{
  const f=await fixture({existing:{...roleRecords(),'posts/old':{uid:'email-user',text:'Old urgent post',category:'แจ้งเตือนด่วน'},'posts/new':{uid:'email-user',text:'General post',category:'ทั่วไป'}}});const data=(await f.request({action:'posts-list',category:'ทั่วไป'})).value;assert.equal(data.posts.length,2);assert.equal(data.posts.every(p=>p.category==='ทั่วไป'),true);assert.equal((await f.request({action:'post-detail',id:'old'})).value.post.category,'ทั่วไป');
  assert.equal((await f.request({action:'post-create',category:'แจ้งเตือนด่วน',text:'rejected'})).code,400);assert.equal((await f.request({action:'posts-list',category:'แจ้งเตือนด่วน'})).code,400);assert.equal(f.records.has('posts/old'),true);
+});
+
+test('Guest can create, edit, archive and restore General and Q&A posts',async()=>{
+ for(const category of ['ทั่วไป','ถาม-ตอบ']){
+  const f=await fixture({guest:true,existing:{'users/email-user':{isGuest:true,displayName:'Guest'}}});
+  const created=await f.request({action:'post-create',text:'Guest post',category});assert.equal(created.code,201);
+  const id=created.value.id;assert.equal(f.records.get('posts/'+id).category,category);
+  assert.equal((await f.request({action:'post-update',id,text:'Edited',category})).code,200);
+  assert.equal((await f.request({action:'post-archive',id})).code,200);
+  assert.equal((await f.request({action:'post-restore',id})).code,200);
+  assert.equal(f.records.get('posts/'+id).category,category);
+ }
 });

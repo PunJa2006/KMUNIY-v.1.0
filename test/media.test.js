@@ -28,9 +28,9 @@ async function mediaFixture({ own = false, published = false, profilePhoto = fal
   const source = (await readFile(new URL('../api/media.js', import.meta.url), 'utf8'))
     .replace(/^\uFEFF?import .*;\r?\n/gm, '')
     .replace(/const root = .*;\r?\n/, "const root = '/media';\n")
-    .replace('export default async function handler', 'async function handler');
+    .replace('export const config', 'const config').replace('export default async function handler', 'async function handler');
   const handler = runInNewContext(`(() => { ${source}; return handler; })()`, {
-    banned, URL, Buffer, process: { env: {} }, MAX_FILE_BYTES: 50 * 1024 * 1024, mediaType,
+    cloudMediaEnabled:()=>false, banned, URL, Buffer, process: { env: {} }, MAX_FILE_BYTES: 50 * 1024 * 1024, mediaType,
     randomUUID: () => id, join: (root, value) => root + '/' + value,
     mkdir: async () => {}, writeFile: async (path, bytes) => files.set(path, bytes), unlink: async path => files.delete(path), readFile: async () => Buffer.from('file bytes'),
     services: () => ({ db, auth: { verifyIdToken: async () => ({ uid: 'viewer' }) } })
