@@ -357,7 +357,7 @@ export default async function handler(req, res) {
           if (!post.exists) throw fail(404, 'ไม่พบโพสต์');
           if (post.data().uid !== claims.uid) throw fail(403, 'จัดการได้เฉพาะโพสต์ของตัวเอง');
           if(post.data().category==='ประกาศ' && !['dev','admin'].includes(await roleFor(db,claims.uid,tx)))throw fail(403,'เฉพาะ Admin และ Dev เท่านั้นที่โพสต์ประกาศได้');
-          if (restoring && isGuest && post.data().category !== 'ถาม-ตอบ') throw fail(403, 'หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login');
+          if (restoring && isGuest && !['ทั่วไป', 'ถาม-ตอบ'].includes(visibleCategory(post.data().category))) throw fail(403, 'หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login');
           tx.create(target, { ...post.data(), category:visibleCategory(post.data().category), ...(restoring ? {saveVersion:randomUUID()} : {}), hashtags: extractHashtags(post.data().text || '') });
           tx.delete(source);
         });
@@ -421,7 +421,7 @@ export default async function handler(req, res) {
       }
       const category = body.category;
       if (!categories.includes(category)) throw fail(400, 'กรุณาเลือกหมวดหมู่โพสต์');
-      if (isGuest && category !== 'ถาม-ตอบ') throw fail(403, 'หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login');
+      if (isGuest && !['ทั่วไป', 'ถาม-ตอบ'].includes(category)) throw fail(403, 'หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login');
       const text = typeof body.text === 'string' ? body.text.trim() : '';
       const mediaIds = body.mediaIds || [];
       if (!Array.isArray(mediaIds) || mediaIds.length > 4 || new Set(mediaIds).size !== mediaIds.length || mediaIds.some(id => typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id))) throw fail(400, 'แนบไฟล์ได้ไม่เกิน 4 ไฟล์');
