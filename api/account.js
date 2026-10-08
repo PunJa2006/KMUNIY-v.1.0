@@ -19,7 +19,8 @@ function services() {
   }
   return { auth: getAuth(), db: getFirestore() };
 }
-const categories = ['ถาม-ตอบ', 'ขายของ', 'ของหาย', 'แจ้งเตือนด่วน'];
+const categories = ['ทั่วไป', 'ถาม-ตอบ', 'ขายของ', 'ของหาย', 'ประกาศ'];
+const visibleCategory = category => category==='แจ้งเตือนด่วน' ? 'ทั่วไป' : category || null;
 function nextMonth(now) {
   const offset = 7 * 60 * 60 * 1000;
   const date = new Date(now + offset);
@@ -49,7 +50,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ message: 'Method not allowed' }); }
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    if (!body || ![...moderationActions, 'profile', 'profile-read', 'username-login', 'username-register', 'posts-list', 'post-create', 'my-posts', 'archive-list', 'post-archive', 'post-restore', 'profile-update', 'post-detail', 'post-like', 'comment-create', 'comment-update', 'comment-delete', 'comment-like', 'author-profile', 'search-users', 'trending-tags', 'post-update', 'post-delete', 'post-save', 'saved-list', 'report-create', 'usage-report-create', 'reports-list', 'report-delete'].includes(body.action)) throw fail(400, 'คำขอไม่ถูกต้อง');
+    if (!body || ![...moderationActions, 'profile', 'profile-read', 'username-login', 'username-register', 'posts-list', 'post-create', 'my-posts', 'archive-list', 'post-archive', 'post-restore', 'profile-update', 'post-detail', 'post-like', 'comment-create', 'comment-update', 'comment-delete', 'comment-like', 'author-profile', 'search-users', 'trending-tags', 'post-update', 'post-delete', 'post-save', 'saved-list', 'report-create', 'usage-report-create', 'contact-admin-create', 'reports-list', 'report-delete'].includes(body.action)) throw fail(400, 'คำขอไม่ถูกต้อง');
     if (!['username-login', 'username-register'].includes(body.action) && !String(req.headers.authorization || '').startsWith('Bearer ')) throw fail(401, 'กรุณาเข้าสู่ระบบใหม่');
     const { auth, db } = services();
     if (body.action === 'username-register') {
@@ -112,7 +113,7 @@ export default async function handler(req, res) {
     if(await banned(db,claims.uid) && body.action!=='usage-report-create')throw Object.assign(fail(403,'บัญชีนี้ถูกแบน กรุณาติดต่อ Dev หรือ Admin'),{code:'ACCOUNT_BANNED'});
     const isGuest = claims.firebase?.sign_in_provider === 'anonymous';
     const profileRef = db.collection('users').doc(claims.uid);
-    if ([...moderationActions, 'posts-list', 'post-create', 'my-posts', 'archive-list', 'post-archive', 'post-restore', 'profile-update', 'post-detail', 'post-like', 'comment-create', 'comment-update', 'comment-delete', 'comment-like', 'author-profile', 'search-users', 'trending-tags', 'post-update', 'post-delete', 'post-save', 'saved-list', 'report-create', 'usage-report-create', 'reports-list', 'report-delete'].includes(body.action)) {
+    if ([...moderationActions, 'posts-list', 'post-create', 'my-posts', 'archive-list', 'post-archive', 'post-restore', 'profile-update', 'post-detail', 'post-like', 'comment-create', 'comment-update', 'comment-delete', 'comment-like', 'author-profile', 'search-users', 'trending-tags', 'post-update', 'post-delete', 'post-save', 'saved-list', 'report-create', 'usage-report-create', 'contact-admin-create', 'reports-list', 'report-delete'].includes(body.action)) {
       const member = await profileRef.get();
       if (!member.exists || (!isGuest && (member.data().isGuest || (!member.data().username && !member.data().email)))) throw fail(403, 'กรุณาสมัครสมาชิกก่อนใช้งาน');
       const moderation=await handleModeration({body,db,claims,fail,FieldValue});
@@ -279,7 +280,7 @@ export default async function handler(req, res) {
         }));
         const data = post.data();
         return res.status(200).json({
-          post: { id: body.id, text: data.text, category: data.category || null, media: data.media || [], ...people.get(data.uid), archived, likeCount: data.likeCount || 0, commentCount: data.commentCount || 0 },
+          post: { id: body.id, text: data.text, category: visibleCategory(data.category), media: data.media || [], ...people.get(data.uid), archived, likeCount: data.likeCount || 0, commentCount: data.commentCount || 0 },
           likes: likeList.docs.map(doc => people.get(doc.data().uid)),
           likesAfter: likeList.docs.length === 100 ? likeList.docs.at(-1).id : null,
           commentsAfter: commentList.hasMore ? commentList.docs.at(-1).id : null,
@@ -355,8 +356,9 @@ export default async function handler(req, res) {
           const post = await tx.get(source);
           if (!post.exists) throw fail(404, 'ไม่พบโพสต์');
           if (post.data().uid !== claims.uid) throw fail(403, 'จัดการได้เฉพาะโพสต์ของตัวเอง');
+          if(post.data().category==='ประกาศ' && !['dev','admin'].includes(await roleFor(db,claims.uid,tx)))throw fail(403,'เฉพาะ Admin และ Dev เท่านั้นที่โพสต์ประกาศได้');
           if (restoring && isGuest && post.data().category !== 'ถาม-ตอบ') throw fail(403, 'หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login');
-          tx.create(target, { ...post.data(), ...(restoring ? {saveVersion:randomUUID()} : {}), hashtags: extractHashtags(post.data().text || '') });
+          tx.create(target, { ...post.data(), category:visibleCategory(post.data().category), ...(restoring ? {saveVersion:randomUUID()} : {}), hashtags: extractHashtags(post.data().text || '') });
           tx.delete(source);
         });
         return res.status(200).json({ saved: true });
@@ -390,7 +392,16 @@ export default async function handler(req, res) {
         const hashtag = body.hashtag === undefined ? null : normalizeHashtag(body.hashtag);
         if (body.action === 'posts-list' && body.hashtag !== undefined && !hashtag) throw fail(400, 'แฮชแท็กไม่ถูกต้อง');
         const query = body.action === 'posts-list' && hashtag ? db.collection('posts').where('hashtags', 'array-contains', hashtag) : body.action === 'author-profile' ? db.collection('posts').where('uid', '==', authorId) : body.action === 'archive-list' ? archive.limit(100) : body.action === 'my-posts' ? db.collection('posts').where('uid', '==', claims.uid).limit(100) : filter === 'ทั้งหมด' ? db.collection('posts').orderBy('createdAt', 'desc').limit(50) : db.collection('posts').where('category', '==', filter);
-        const snapshot = body.action === 'saved-list' ? await savedPosts(db,claims.uid) : await query.get();
+        let snapshot = body.action === 'saved-list' ? await savedPosts(db,claims.uid) : await query.get();
+        if(body.action==='posts-list' && filter==='ทั่วไป' && !hashtag){
+          const legacy=await db.collection('posts').where('category','==','แจ้งเตือนด่วน').get();
+          snapshot={docs:[...snapshot.docs,...legacy.docs]};
+        }
+        let announcements;
+        if(body.action==='posts-list'){
+          const announcementDocs=filter==='ประกาศ' && !hashtag?snapshot:await db.collection('posts').where('category','==','ประกาศ').get();
+          announcements=announcementDocs.docs.map(doc=>({id:doc.id,text:doc.data().text || '',createdAt:doc.data().createdAt?.toDate().toISOString() || null})).sort((a,b)=>(b.createdAt || '').localeCompare(a.createdAt || '')).slice(0,5);
+        }
         const authors = new Map();
         await Promise.all([...new Set(snapshot.docs.map(doc => doc.data().uid))].filter(Boolean).map(async uid => {
           const author = uid === claims.uid ? member : await db.collection('users').doc(uid).get();
@@ -402,11 +413,11 @@ export default async function handler(req, res) {
         const ownLikes = new Map(), ownSaved = new Map();
         await Promise.all(snapshot.docs.map(async doc => { ownLikes.set(doc.id, (await db.collection('posts').doc(doc.id).collection('likes').doc(claims.uid).get()).exists); }));
         await Promise.all(snapshot.docs.map(async doc=>{const bookmark=await profileRef.collection('saved').doc(doc.id).get();ownSaved.set(doc.id,bookmark.exists && bookmark.data().saveVersion === (doc.data().saveVersion || 'initial'));}));
-        const posts = snapshot.docs.filter(doc => !hashtag || filter === 'ทั้งหมด' || doc.data().category === filter).map(doc => {
+        const posts = snapshot.docs.filter(doc => !hashtag || filter === 'ทั้งหมด' || visibleCategory(doc.data().category) === filter).map(doc => {
           const post = doc.data();
-          return { id: doc.id, suspended:authors.get(post.uid)?.suspended || false, canDelete:access.canModerate, saved: ownSaved.get(doc.id) || false, likeCount: post.likeCount || 0, commentCount: post.commentCount || 0, liked: ownLikes.get(doc.id) || false, text: post.text, category: post.category || null, displayName: authors.get(post.uid)?.displayName || post.displayName, authorHandle: authors.get(post.uid)?.handle || null, authorRole: authors.get(post.uid)?.authorRole || null, authorPhotoId: authors.get(post.uid)?.isGuest ? null : authors.get(post.uid)?.photoMediaId || null, own: post.uid === claims.uid, media: post.media || [], createdAt: post.createdAt?.toDate().toISOString() || null };
+          return { id: doc.id, suspended:authors.get(post.uid)?.suspended || false, canDelete:access.canModerate, saved: ownSaved.get(doc.id) || false, likeCount: post.likeCount || 0, commentCount: post.commentCount || 0, liked: ownLikes.get(doc.id) || false, text: post.text, category: visibleCategory(post.category), displayName: authors.get(post.uid)?.displayName || post.displayName, authorHandle: authors.get(post.uid)?.handle || null, authorRole: authors.get(post.uid)?.authorRole || null, authorPhotoId: authors.get(post.uid)?.isGuest ? null : authors.get(post.uid)?.photoMediaId || null, own: post.uid === claims.uid, media: post.media || [], createdAt: post.createdAt?.toDate().toISOString() || null };
         }).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-        return res.status(200).json({ ...(viewedAuthor ? { profile: viewedAuthor } : {}), posts: body.action === 'posts-list' ? posts.slice(0, 50) : viewedAuthor ? posts.slice(0, 100) : posts });
+        return res.status(200).json({ ...(viewedAuthor ? { profile: viewedAuthor } : {}), ...(announcements ? {announcements} : {}), posts: body.action === 'posts-list' ? posts.slice(0, 50) : viewedAuthor ? posts.slice(0, 100) : posts });
       }
       const category = body.category;
       if (!categories.includes(category)) throw fail(400, 'กรุณาเลือกหมวดหมู่โพสต์');
@@ -419,7 +430,9 @@ export default async function handler(req, res) {
       let postAvailableAt, postCooldownExempt;
       await db.runTransaction(async tx => {
         const current = await tx.get(profileRef);
-        postCooldownExempt = !isGuest && ['dev','admin','merchant'].includes(await roleFor(db,claims.uid,tx));
+        const currentRole=await roleFor(db,claims.uid,tx);
+        if(category==='ประกาศ' && (isGuest || !['dev','admin'].includes(currentRole)))throw fail(403,'เฉพาะ Admin และ Dev เท่านั้นที่โพสต์ประกาศได้');
+        postCooldownExempt = !isGuest && ['dev','admin','merchant'].includes(currentRole);
         const now = Date.now();
         const availableAt = current.data().postAvailableAt || 0;
         if (!postCooldownExempt && now < availableAt) {
