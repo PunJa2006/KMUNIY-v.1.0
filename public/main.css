@@ -104,10 +104,10 @@ p:has(> .handle-prefix) { position: relative; }
 .post-category { font-size: 11px; color: var(--accent-text); background: var(--accent-soft); border-radius: 8px; padding: 4px 9px; white-space: nowrap; }
 .post-category[data-category="ขายของ"] { color: #8b6226; background: #faf0dc; }
 .post-category[data-category="ของหาย"] { color: #6d59a0; background: #f0ebfb; }
-.post-category[data-category="แจ้งเตือนด่วน"] { color: #a64444; background: #fce9e7; }
+.post-category[data-category="ประกาศ"] { color: #a64444; background: #fce9e7; }
 :root[data-theme="dark"] .post-category[data-category="ขายของ"] { color: #f2cd8e; background: #493d29; }
 :root[data-theme="dark"] .post-category[data-category="ของหาย"] { color: #cebbf3; background: #3c3150; }
-:root[data-theme="dark"] .post-category[data-category="แจ้งเตือนด่วน"] { color: #ffb8b1; background: #4e2f2c; }
+:root[data-theme="dark"] .post-category[data-category="ประกาศ"] { color: #ffb8b1; background: #4e2f2c; }
 .post-content { white-space: pre-wrap; overflow-wrap: anywhere; }
 .post-card > .post-content { grid-column: 1 / -1; margin: 16px 0 14px; line-height: 1.9; }
 .post-attachment { grid-column: 1 / -1; min-width: 0; }
@@ -397,15 +397,18 @@ body:has(dialog[open]) { overflow: hidden; }
 .remove-search-history{flex:none;width:44px;padding:0;background:transparent;font-size:22px}
 
 
-.sidebar #open-usage-report{order:6;min-height:44px;padding:8px 12px;font-size:12px;text-align:left}
+.sidebar #open-contact-admin{order:6;min-height:44px;padding:8px 12px;font-size:12px;text-align:left}
+#open-contact-admin{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' d='M21 11a8 8 0 0 1-8 8H7l-4 3V11a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8ZM7 10h10M7 14h6'/%3E%3C/svg%3E")}
+.sidebar #open-usage-report{order:7;min-height:44px;padding:8px 12px;font-size:12px;text-align:left}
 #open-usage-report{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 2 21h20L12 3ZM12 9v5M12 17v.2'/%3E%3C/g%3E%3C/svg%3E")}
-#usage-report-dialog>p{margin-top:8px;font-size:13px;color:var(--muted)}
-#usage-report-form{margin-top:18px}
-#usage-report-form label{display:block;margin-bottom:8px;font-size:13px}
-#usage-report-status{margin:12px 0}
+#contact-admin-dialog>p,#usage-report-dialog>p{margin-top:8px;font-size:13px;color:var(--muted)}
+#contact-admin-form,#usage-report-form{margin-top:18px}
+#contact-admin-form label,#usage-report-form label{display:block;margin-bottom:8px;font-size:13px}
+#contact-admin-status,#usage-report-status{margin:12px 0}
 @media(max-width:680px){
-  .sidebar #open-usage-report{order:initial;grid-column:1 / -1;grid-row:2;flex-direction:row;min-height:36px;padding:5px 10px;font-size:11px;justify-content:center;border-radius:10px}
-  .community-page>main{padding-bottom:calc(130px + env(safe-area-inset-bottom,0px))}
+  .sidebar #open-contact-admin,.sidebar #open-usage-report{order:initial;grid-column:1 / -1;grid-row:2;flex-direction:row;min-height:36px;padding:5px 10px;font-size:11px;justify-content:center;border-radius:10px}
+  .sidebar #open-usage-report{grid-row:3}
+  .community-page>main{padding-bottom:calc(172px + env(safe-area-inset-bottom,0px))}
 }
 
 
@@ -453,3 +456,8 @@ body:has(dialog[open]) { overflow: hidden; }
 .role-badge[data-role="dev"] { background-size: 100% 100%, 200% 100%; animation: dev-rgb-flow 4s linear infinite; }
 .role-badge[data-role="dev"] .role-label { background-size: 200% 100%; animation: dev-rgb-flow 4s linear infinite; }
 @keyframes dev-rgb-flow { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+
+.announcement-link{display:inline;min-height:0;padding:0 24px 0 0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;font-weight:500;white-space:nowrap;vertical-align:baseline}
+.announcement-link:hover{background:transparent;color:var(--accent-text);text-decoration:underline}
+
+#university-announcement:hover .announcement-track,#university-announcement:focus-within .announcement-track{animation-play-state:paused}

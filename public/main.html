@@ -15,6 +15,7 @@
 <p class="nav-caption" data-i18n="ชุมชนของคุณ">ชุมชนของคุณ</p>
 <button id="home" type="button" aria-current="page" data-i18n="หน้าแรก">หน้าแรก</button>
 <button id="open-post" type="button" data-i18n="โพสต์">โพสต์</button>
+<button id="open-contact-admin" type="button" aria-haspopup="dialog" aria-controls="contact-admin-dialog" data-i18n="ติดต่อแอดมิน">ติดต่อแอดมิน</button>
 <button id="open-usage-report" type="button" aria-haspopup="dialog" aria-controls="usage-report-dialog" data-i18n="รายงานปัญหาการใช้งาน">รายงานปัญหาการใช้งาน</button>
 <button id="open-search" type="button" aria-haspopup="dialog" aria-controls="search-dialog" data-i18n="ค้นหา">ค้นหา</button>
 <button id="me" type="button" data-i18n="ฉัน">ฉัน</button>
@@ -36,8 +37,8 @@
 </section>
 <div class="feed-toolbar">
 <section id="university-announcement" aria-label="ประกาศจากมหาวิทยาลัย" data-i18n-aria-label="ประกาศจากมหาวิทยาลัย">
-<span class="sr-only">System : Welcome to my website kub ^_^</span>
-<span class="announcement-track" aria-hidden="true">System : Welcome to my website kub ^_^</span>
+<span id="announcement-accessible" class="sr-only" aria-hidden="true">System : Welcome to my website kub ^_^</span>
+<span id="announcement-track" class="announcement-track">System : Welcome to my website kub ^_^</span>
 </section>
 <h2 id="feed-heading" hidden data-i18n="ฟีดโพสต์">ฟีดโพสต์</h2>
 <section id="filter-controls" aria-label="กรองโพสต์" data-i18n-aria-label="กรองโพสต์">
@@ -97,10 +98,11 @@
 <h2 id="filter-heading" data-i18n="Filter · เลือกหมวดหมู่">Filter · เลือกหมวดหมู่</h2>
 <nav id="category-filters" aria-label="เลือกหมวดหมู่โพสต์" data-i18n-aria-label="เลือกหมวดหมู่โพสต์">
 <button id="category-all" type="button" aria-pressed="true" data-i18n="ทั้งหมด">ทั้งหมด</button>
+<button id="category-general" type="button" aria-pressed="false" data-i18n="ทั่วไป">ทั่วไป</button>
 <button id="category-qa" type="button" aria-pressed="false" data-i18n="ถาม-ตอบ">ถาม-ตอบ</button>
 <button id="category-market" type="button" aria-pressed="false" data-i18n="ขายของ">ขายของ</button>
 <button id="category-lost" type="button" aria-pressed="false" data-i18n="ของหาย">ของหาย</button>
-<button id="category-urgent" type="button" aria-pressed="false" data-i18n="แจ้งเตือนด่วน">แจ้งเตือนด่วน</button>
+<button id="category-announcement" type="button" aria-pressed="false" data-i18n="ประกาศ">ประกาศ</button>
 </nav>
 <button id="close-filter" type="button" data-i18n="ปิด">ปิด</button>
 </dialog>
@@ -110,7 +112,8 @@
 <p><label for="post-category" data-i18n="หมวดหมู่โพสต์">หมวดหมู่โพสต์</label><br>
 <select id="post-category" required aria-describedby="guest-category-note">
 <option id="post-category-placeholder" value="" data-i18n="เลือกหมวดหมู่">เลือกหมวดหมู่</option>
-<option value="ถาม-ตอบ" data-i18n="ถาม-ตอบ">ถาม-ตอบ</option><option id="post-category-market" value="ขายของ" data-i18n="ขายของ">ขายของ</option><option id="post-category-lost" value="ของหาย" data-i18n="ของหาย">ของหาย</option><option id="post-category-urgent" value="แจ้งเตือนด่วน" data-i18n="แจ้งเตือนด่วน">แจ้งเตือนด่วน</option>
+<option id="post-category-general" value="ทั่วไป" data-i18n="ทั่วไป">ทั่วไป</option>
+<option value="ถาม-ตอบ" data-i18n="ถาม-ตอบ">ถาม-ตอบ</option><option id="post-category-market" value="ขายของ" data-i18n="ขายของ">ขายของ</option><option id="post-category-lost" value="ของหาย" data-i18n="ของหาย">ของหาย</option><option id="post-category-announcement" value="ประกาศ" hidden disabled data-i18n="ประกาศ">ประกาศ</option>
 </select></p>
 <p id="guest-category-note" hidden data-i18n="หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login">หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login</p>
 <div class="post-text-field"><label for="post-text" data-i18n="ข้อความโพสต์">ข้อความโพสต์</label>
@@ -151,6 +154,15 @@
 <p id="delete-post-status" role="status" aria-live="polite"></p>
 <button id="confirm-delete-post" type="button" data-i18n="ลบโพสต์">ลบโพสต์</button><button id="cancel-delete-post" type="button" data-i18n="ยกเลิก">ยกเลิก</button>
 </dialog>
+<dialog id="contact-admin-dialog" aria-labelledby="contact-admin-heading">
+<h2 id="contact-admin-heading" data-i18n="ติดต่อแอดมิน">ติดต่อแอดมิน</h2>
+<p data-i18n="ส่งถึง Dev และ Admin">ส่งถึง Dev และ Admin</p>
+<form id="contact-admin-form"><fieldset id="contact-admin-fields">
+<p><label for="contact-admin-details" data-i18n="ข้อความ">ข้อความ</label><textarea id="contact-admin-details" rows="5" maxlength="2000" required placeholder="เขียนเรื่องที่ต้องการติดต่อ" data-i18n-placeholder="เขียนเรื่องที่ต้องการติดต่อ"></textarea></p>
+<p id="contact-admin-status" role="status" aria-live="polite"></p>
+<button type="submit" data-i18n="ส่งข้อความ">ส่งข้อความ</button><button id="cancel-contact-admin" type="button" data-i18n="ยกเลิก">ยกเลิก</button>
+</fieldset></form>
+</dialog>
 <dialog id="usage-report-dialog" aria-labelledby="usage-report-heading">
 <h2 id="usage-report-heading" data-i18n="รายงานปัญหาการใช้งาน">รายงานปัญหาการใช้งาน</h2>
 <p data-i18n="ส่งถึง Dev">ส่งถึง Dev</p>
@@ -177,6 +189,7 @@
 <button id="reports-category-post" type="button" aria-pressed="true" data-i18n="โพสต์">โพสต์</button>
 <button id="reports-category-comment" type="button" aria-pressed="false" data-i18n="คอมเมนต์">คอมเมนต์</button>
 <button id="reports-category-appeal" type="button" aria-pressed="false" data-i18n="คำร้องจากผู้ถูก Ban">คำร้องจากผู้ถูก Ban</button>
+<button id="reports-category-general" type="button" aria-pressed="false" data-i18n="ทั่วไป">ทั่วไป</button>
 <button id="reports-category-usage" type="button" aria-pressed="false" hidden data-i18n="ปัญหาการใช้งาน">ปัญหาการใช้งาน</button>
 </div>
 <p id="reports-status" role="status" aria-live="polite"></p><div id="reports-list"></div>

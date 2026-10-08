@@ -25,7 +25,7 @@ $('close-filter').addEventListener('click', closeFilter);
 $('filter-dialog').addEventListener('close', () => {
   $('toggle-filter').setAttribute('aria-expanded', 'false');
 });
-const categoryButtons = { 'category-all': 'ทั้งหมด', 'category-qa': 'ถาม-ตอบ', 'category-market': 'ขายของ', 'category-lost': 'ของหาย', 'category-urgent': 'แจ้งเตือนด่วน' };
+const categoryButtons = { 'category-all': 'ทั้งหมด', 'category-general': 'ทั่วไป', 'category-qa': 'ถาม-ตอบ', 'category-market': 'ขายของ', 'category-lost': 'ของหาย', 'category-announcement': 'ประกาศ' };
 for (const [id, category] of Object.entries(categoryButtons)) {
   $(id).addEventListener('click', () => {
     selectedCategory = category;
@@ -160,6 +160,7 @@ function roleBadge(element,role){
   }
 }
 function updatePermissions(){
+  updatePostCategories();
   $('admin-menu').hidden=!(profile.canReceiveReports || isStaff());
   $('open-reports').hidden=!profile.canReceiveReports;
   $('open-restricted').hidden=!isStaff();roleBadge($('my-role'),profile.role);
@@ -178,7 +179,11 @@ function setTheme(theme) {
 }
 function updatePostCategories() {
   const guest = sdk?.auth.currentUser?.isAnonymous === true;
-  for (const id of ['post-category-placeholder', 'post-category-market', 'post-category-lost', 'post-category-urgent']) $(id).disabled = guest;
+  for (const id of ['post-category-placeholder', 'post-category-general', 'post-category-market', 'post-category-lost']) $(id).disabled = guest;
+  const staff=!guest && ['dev','admin'].includes(profile?.role);
+  $('post-category-announcement').hidden=!staff;
+  $('post-category-announcement').disabled=!staff;
+  if(!staff && $('post-category').value==='ประกาศ')$('post-category').value='';
   $('guest-category-note').hidden = !guest;
   if (guest) $('post-category').value = 'ถาม-ตอบ';
 }
@@ -463,6 +468,20 @@ function renderPosts(posts, targetView) {
   }
   $('feed-status').textContent = posts.length ? (targetView === 'home' ? '' : t('แสดง {count} โพสต์', { count: posts.length })) : targetView === 'saved' ? t('ยังไม่มีโพสต์ที่บันทึกไว้') : targetView === 'archive' ? t('ยังไม่มีโพสต์ในคลัง') : targetView === 'me' ? t('คุณยังไม่มีโพสต์') : targetView === 'author' ? t('ยังไม่มีโพสต์ที่เผยแพร่') : selectedHashtag ? t('ยังไม่มีโพสต์ที่ใช้ #{tag}', { tag: selectedHashtag }) : selectedCategory === 'ทั้งหมด' ? t('ยังไม่มีโพสต์ เริ่มโพสต์แรกได้เลย') : t('ยังไม่มีโพสต์ในหมวด ') + t(selectedCategory);
 }
+function renderAnnouncements(announcements=[]){
+  const track=$('announcement-track'),accessible=$('announcement-accessible');
+  const fallback='System : Welcome to my website kub ^_^';
+  track.replaceChildren();
+  if(!announcements.length){track.textContent=fallback;accessible.textContent=fallback;return;}
+  track.textContent='';
+  accessible.textContent=announcements.map(post=>t('ประกาศ')+': '+(post.text || t('ประกาศพร้อมไฟล์แนบ'))).join(' · ');
+  for(const post of announcements){
+    const button=document.createElement('button');button.type='button';button.className='announcement-link';
+    button.textContent=t('ประกาศ')+': '+(post.text || t('ประกาศพร้อมไฟล์แนบ')).replace(/\s+/g,' ');
+    button.addEventListener('click',()=>openSocial('comments',post.id));
+    track.append(button);
+  }
+}
 async function loadFeed() {
   const version = ++feedVersion;
   const targetView = view;
@@ -485,6 +504,7 @@ async function loadFeed() {
         $('author-profile').hidden = false;
         $('feed-heading').textContent = t('โพสต์ของ ') + personName(data.profile);
       }
+      if(targetView==='home')renderAnnouncements(data.announcements || []);
       renderPosts(data.posts, targetView);
       if(targetView==='saved')savedSignature=JSON.stringify(data.posts);
     }
@@ -700,23 +720,27 @@ $('confirm-delete-post').addEventListener('click',async()=>{
   catch(error){$('delete-post-status').textContent=localizeError(error.message);}
   finally{deletingPost=false;$('confirm-delete-post').disabled=false;}
 });
-let sendingUsageReport=false;
-$('open-usage-report').addEventListener('click',()=>{
-  if(sendingUsageReport)return;
-  $('usage-report-status').textContent='';$('usage-report-dialog').showModal();$('usage-report-details').focus();
-});
-$('cancel-usage-report').addEventListener('click',()=>{if(!sendingUsageReport)$('usage-report-dialog').close();});
-$('usage-report-dialog').addEventListener('cancel',event=>{if(sendingUsageReport)event.preventDefault();});
-$('usage-report-form').addEventListener('submit',async event=>{
-  event.preventDefault();if(sendingUsageReport)return;
-  const details=$('usage-report-details').value.trim();
-  if(!details){$('usage-report-status').textContent=t('กรุณาอธิบายปัญหาการใช้งาน');return;}
-  if(details.length>2000){$('usage-report-status').textContent=t('อธิบายเพิ่มเติมได้ไม่เกิน 2,000 ตัวอักษร');return;}
-  sendingUsageReport=true;$('usage-report-fields').disabled=true;$('usage-report-status').textContent=t('กำลังส่งรายงาน…');
-  try{await call('usage-report-create',{details});$('usage-report-dialog').close();$('usage-report-details').value='';status.textContent=t('ส่งรายงานปัญหาให้ Dev แล้ว');}
-  catch(error){$('usage-report-status').textContent=localizeError(error.message);}
-  finally{sendingUsageReport=false;$('usage-report-fields').disabled=false;}
-});
+function bindMessageDialog(prefix,action,emptyMessage,successMessage){
+  let sending=false;
+  $('open-'+prefix).addEventListener('click',()=>{
+    if(sending)return;
+    $(prefix+'-status').textContent='';$(prefix+'-dialog').showModal();$(prefix+'-details').focus();
+  });
+  $('cancel-'+prefix).addEventListener('click',()=>{if(!sending)$(prefix+'-dialog').close();});
+  $(prefix+'-dialog').addEventListener('cancel',event=>{if(sending)event.preventDefault();});
+  $(prefix+'-form').addEventListener('submit',async event=>{
+    event.preventDefault();if(sending)return;
+    const details=$(prefix+'-details').value.trim();
+    if(!details){$(prefix+'-status').textContent=t(emptyMessage);return;}
+    if(details.length>2000){$(prefix+'-status').textContent=t('อธิบายเพิ่มเติมได้ไม่เกิน 2,000 ตัวอักษร');return;}
+    sending=true;$(prefix+'-fields').disabled=true;$(prefix+'-status').textContent=t('กำลังส่งรายงาน…');
+    try{await call(action,{details});$(prefix+'-dialog').close();$(prefix+'-details').value='';status.textContent=t(successMessage);}
+    catch(error){$(prefix+'-status').textContent=localizeError(error.message);}
+    finally{sending=false;$(prefix+'-fields').disabled=false;}
+  });
+}
+bindMessageDialog('usage-report','usage-report-create','กรุณาอธิบายปัญหาการใช้งาน','ส่งรายงานปัญหาให้ Dev แล้ว');
+bindMessageDialog('contact-admin','contact-admin-create','กรุณาเขียนข้อความที่ต้องการติดต่อ','ส่งข้อความให้ Dev และ Admin แล้ว');
 function openReport(postId,commentId=null){
   if(reporting)return;reportPostId=postId;reportCommentId=commentId;$('report-heading').textContent=t(commentId?'รายงานคอมเมนต์':'รายงานโพสต์');
   $('report-reason').value='';$('report-details').value='';$('report-status').textContent='';$('report-dialog').showModal();
@@ -737,7 +761,7 @@ async function refreshSaved(){
   catch(error){if(view==='saved' && version===feedVersion)$('feed-status').textContent=localizeError(error.message);}
 }
 let reportsCategory='post';
-const reportsCategories={post:'โพสต์',comment:'คอมเมนต์',appeal:'คำร้องจากผู้ถูก Ban',usage:'ปัญหาการใช้งาน'};
+const reportsCategories={post:'โพสต์',comment:'คอมเมนต์',appeal:'คำร้องจากผู้ถูก Ban',general:'ทั่วไป',usage:'ปัญหาการใช้งาน'};
 function updateReportCategories(){
   const reset=reportsCategory==='usage' && profile?.role!=='dev';
   if(reset){reportsCategory='post';reportsVersion++;$('reports-list').replaceChildren();}
@@ -756,7 +780,7 @@ async function loadReports(){
   try{const data=await call('reports-list',{category:reportsCategory});if(version!==reportsVersion || !$('reports-dialog').open)return;
     for(const report of data.reports){
       const article=document.createElement('article'),heading=document.createElement('h3'),reason=document.createElement('p'),post=document.createElement('blockquote'),details=document.createElement('p'),time=document.createElement('p');
-      heading.textContent=t('รายงานจาก ')+report.reporter.displayName+(report.reporter.handle?' @'+report.reporter.handle:'');const messageReport=report.kind==='usage' || report.kind==='appeal';reason.textContent=t(messageReport?reportsCategories[report.kind]:report.reason==='spam'?'สแปม':'ไม่เหมาะสม');
+      heading.textContent=t('รายงานจาก ')+report.reporter.displayName+(report.reporter.handle?' @'+report.reporter.handle:'');const messageReport=['usage','appeal','general'].includes(report.kind);reason.textContent=t(messageReport?reportsCategories[report.kind]:report.reason==='spam'?'สแปม':'ไม่เหมาะสม');
       if(messageReport)post.hidden=true;
       else{const target=report.comment || report.post;post.textContent=(report.comment?t('รายงานคอมเมนต์')+'\n':'')+target.displayName+(target.handle?' @'+target.handle:'')+'\n'+target.text;}
       post.className=details.className='post-content';details.textContent=report.details;time.className='post-time';time.textContent=report.createdAt?new Date(report.createdAt).toLocaleString(dateLocale()):'';
@@ -914,6 +938,7 @@ $('post-form').addEventListener('submit', async event => {
   const category = $('post-category').value;
   if (!Object.values(categoryButtons).filter(label => label !== 'ทั้งหมด').includes(category)) { $('post-status').textContent = t('กรุณาเลือกหมวดหมู่โพสต์'); return; }
   if (sdk.auth.currentUser.isAnonymous && category !== 'ถาม-ตอบ') { $('post-status').textContent = t('หากต้องการ Post หมวดหมู่ที่ถูกล็อกไว้ กรุณา Login'); return; }
+  if(category==='ประกาศ' && !['dev','admin'].includes(profile?.role)){ $('post-status').textContent=t('เฉพาะ Admin และ Dev เท่านั้นที่โพสต์ประกาศได้');return;}
   const text = $('post-text').value.trim();
   if (!text && !selectedFiles.length) { $('post-status').textContent = t('กรุณาพิมพ์ข้อความหรือแนบรูปภาพ/วิดีโอ'); return; }
   posting = true;
